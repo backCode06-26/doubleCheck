@@ -1,4 +1,3 @@
-import sys
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QScrollArea,
     QPushButton, QLabel, QCheckBox,
@@ -9,10 +8,7 @@ from PySide6.QtCore import Qt, QThreadPool
 from PySide6.QtGui import QFont
 
 import os
-import numpy as np
-import matplotlib.pyplot as plt
 
-from output import OutputOverlay
 from viewport_image_loader import LazyImageViewer
 from work_thread import ImageProcessRunnable
 
