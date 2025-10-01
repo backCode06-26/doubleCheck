@@ -33,7 +33,10 @@ class ImageProcessRunnable(QRunnable):
     def run(self):
 
         self.blank_paths = []
+        self.blank_sceen = set()
+
         self.double_paths = []
+        self.double_sceen = set()
 
         self.signals.progress.emit("검사시작")
 
@@ -67,13 +70,14 @@ class ImageProcessRunnable(QRunnable):
             # 첫 이미지 백지 체크
             if is_blank_page(first_path):
 
-                if image_files[i] in self.blank_paths:
+                if image_files[i] in self.blank_sceen:
                     continue
 
                 share_list.pop(main_idx)
 
                 self.signals.progress.emit(f"{image_files[i]}: 백지답안")
                 self.blank_paths.append(image_files[i])
+                self.blank_sceen.add(image_files[i])
 
                 # 비교 진행도 초기화
                 self.signals.update_main_progress.emit(1)
@@ -89,13 +93,14 @@ class ImageProcessRunnable(QRunnable):
 
                 if is_blank_page(second_path):
 
-                    if image_files[j] in self.blank_paths:
+                    if image_files[j] in self.blank_sceen:
                         continue
 
                     share_list.pop(sub_idx)
 
                     self.signals.progress.emit(f"{image_files[j]}: 백지답안")
                     self.blank_paths.append(image_files[j])
+                    self.blank_sceen.add(image_files[j])
 
                     continue
 
@@ -128,8 +133,13 @@ class ImageProcessRunnable(QRunnable):
                 print(score)
 
                 if score >= 0.75:
-                    self.double_paths.append(image_files[i])
-                    self.double_paths.append(image_files[j])
+                    if image_files[i] not in self.double_sceen:
+                        self.double_paths.append(image_files[i])
+                        self.double_sceen.add(image_files[i])
+
+                    if image_files[j] not in self.double_sceen:
+                        self.double_paths.append(image_files[j])
+                        self.double_sceen.add(image_files[j])
 
                     self.signals.progress.emit(
                         f"{image_files[i]}, {image_files[j]}: 중복답안")

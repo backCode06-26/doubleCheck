@@ -1,13 +1,34 @@
-import cv2
-import numpy as np
+from PySide6.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout
 
-img = np.ones((500, 500, 3), dtype=np.uint8) * 255
 
-color = (0, 0, 0)
-thickness = 5
+class ToggleWidgetDemo(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Hide/Show Widget Example")
 
-cv2.line(img, (0, 0), (499, 499), color, thickness)
-cv2.line(img, (499, 0), (0, 499), color, thickness)
+        layout = QVBoxLayout(self)
 
-# 3. 결과 보여주기
-cv2.imwrite("null_image.JPG", img)
+        # 숨기거나 보일 위젯
+        self.target_widget = QPushButton("I am a target widget")
+        layout.addWidget(self.target_widget)
+
+        # 토글 버튼
+        self.toggle_button = QPushButton("Hide / Show")
+        self.toggle_button.clicked.connect(self.toggle_widget)
+        layout.addWidget(self.toggle_button)
+
+    def toggle_widget(self):
+        # 위젯 숨기거나 보이게 하기
+        if self.target_widget.isVisible():
+            self.target_widget.hide()
+        else:
+            self.target_widget.show()
+
+
+if __name__ == "__main__":
+    app = QApplication([])
+
+    demo = ToggleWidgetDemo()
+    demo.show()
+
+    app.exec()
