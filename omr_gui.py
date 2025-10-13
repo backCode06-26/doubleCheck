@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QScrollArea,
-    QPushButton, QLabel, QCheckBox,
+    QWidget, QVBoxLayout, QHBoxLayout, QSlider,
+    QPushButton, QLabel,
     QFileDialog, QFrame, QProgressBar
 )
 
@@ -10,7 +10,7 @@ from PySide6.QtGui import QFont
 import os
 
 from viewport_image_loader import LazyImageViewer
-from graphics_view import GraphicsView
+from graphics_view import GraphicsScene
 from work_thread import ImageProcessRunnable
 from select_btns import SelectBtns
 from zoom_in_btn import ZoomInBtn
@@ -73,7 +73,7 @@ class omr_gui(QWidget):
 
         # top_b_layout_scroll 추가
         self.top_b_layout_scroll = LazyImageViewer()
-        self.view = GraphicsView(self.top_b_layout_scroll.scene)
+        self.view = GraphicsScene(self.top_b_layout_scroll.scene)
 
         # left_layout 위젯 추가
         top_b_layout.addWidget(self.top_b_layout_scroll)
@@ -153,20 +153,30 @@ class omr_gui(QWidget):
         # main_right_layout layout 추가
         main_right_layout.addLayout(bottom_layout)
 
+        # 답안의 수를 표시하는 위젯
         self.main_left_layout = QVBoxLayout()
         main_left_all_lebal = QLabel("전체 답안 수")
-        self.main_left_all_count = QLabel()
+        self.main_left_all_count = QLabel("0 장")
 
         main_left_blank_lebal = QLabel("백지 답안 수")
-        self.main_left_blank_count = QLabel()
+        self.main_left_blank_count = QLabel("0 장")
 
         main_left_double_lebal = QLabel("중복 답안 수")
-        self.main_left_double_count = QLabel()
+        self.main_left_double_count = QLabel("0 장")
 
-        self.main_left_all_count.setText("0 장")
-        self.main_left_blank_count.setText("0 장")
-        self.main_left_double_count.setText("0 장")
+        # 이미지 비교에 필요한 hash값을 정하는 위젯
+        self.main_left_slider = QSlider(Qt.Horizontal)
+        self.main_left_slider.setMinimum(0)
+        self.main_left_slider.setMaximum(100)
+        self.main_left_slider.setSingleStep(1)
+        self.main_left_slider.setFixedWidth(80)
 
+        # 현재 hash값을 표시하는 라벨
+        self.main_left_slider.valueChanged.connect(self.on_value_change)
+        self.main_left_slider_label = QLabel("현재 Hash값: 0")
+        self.main_left_slider_label.setProperty("hash_value", 0)
+
+        # 레이아웃에 추가
         self.main_left_layout.addStretch(1)
         self.main_left_layout.addWidget(main_left_all_lebal)
         self.main_left_layout.addWidget(self.main_left_all_count)
@@ -178,12 +188,22 @@ class omr_gui(QWidget):
 
         self.main_left_layout.addWidget(main_left_double_lebal)
         self.main_left_layout.addWidget(self.main_left_double_count)
-        self.main_left_layout.addStretch(15)
+        self.main_left_layout.addStretch(2)
+        
+        self.main_left_layout.addWidget(self.main_left_slider)
+        self.main_left_layout.addWidget(self.main_left_slider_label)
+
+        self.main_left_layout.addStretch(12)
 
         main_layout.addLayout(main_right_layout)
         main_layout.addLayout(self.main_left_layout)
 
         self.setLayout(main_layout)
+
+    def on_value_change(self, value):
+        float_value = value / 10  # 다시 0.1 단위로 변환
+        self.main_left_slider_label.setText(f"현재 Hash값: {float_value:.1f}")
+        self.main_left_slider_label.setProperty("hash_value", float_value)
 
     def set_main_paths(self, paths):
         self.main_images = paths
@@ -333,17 +353,21 @@ class omr_gui(QWidget):
         else:
             self.is_check = True
 
+    # 해시 값 반환함수
+    def get_hash_value(self):
+        hash_value = self.main_left_slider_label.property("hash_value")
+        return hash_value
+
     # 검사 실행 함수
-
     def image_progress(self):
-
         self.bt_main_process.setValue(0)
+        hash_value = self.get_hash_value()
 
         if self.existing_path:
             self.thread_pool = QThreadPool.globalInstance()
 
             self.current_runnable = ImageProcessRunnable(
-                self.existing_path, batch_size=5)
+                self.existing_path, hash_value, batch_size=5)
 
             self.current_runnable.signals.finished.connect(
                 lambda: self.last_progress())

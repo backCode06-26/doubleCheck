@@ -2,16 +2,16 @@ import cv2
 import numpy as np
 from extract_region import crop_roi
 
-import os
+# import os
 
-folder_path = "C:/Users/hojin/OneDrive/Desktop/이중급지 테스트용 답안"
+# folder_path = "C:/Users/hojin/OneDrive/Desktop/이중급지 테스트용 답안"
 
-IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".bmp")
-image_paths = [
-    os.path.join(folder_path, f)
-    for f in os.listdir(folder_path)
-    if f.lower().endswith(IMAGE_EXTENSIONS)
-]
+# IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".bmp")
+# image_paths = [
+#     os.path.join(folder_path, f)
+#     for f in os.listdir(folder_path)
+#     if f.lower().endswith(IMAGE_EXTENSIONS)
+# ]
 
 
 def is_blank_page(img_path):

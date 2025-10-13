@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-
+from pathlib import Path
 
 def sort_corners(pts):
     pts = np.array(pts, dtype="float32")
@@ -55,6 +55,8 @@ def get_skew_angle(img):
 
 
 def correct_skew(img_path):
+    img_path = Path(img_path)
+
     with open(img_path, "rb") as f:
         file_bytes = np.asarray(bytearray(f.read()), dtype=np.uint8)
     img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)

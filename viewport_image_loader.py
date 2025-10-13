@@ -1,9 +1,12 @@
 import math
 import os
 import cv2
-from PySide6.QtWidgets import QWidget, QGraphicsView, QGraphicsScene, QVBoxLayout
+import numpy as np
+from pathlib import Path
+from PySide6.QtWidgets import QWidget, QGraphicsView, QGraphicsScene, QVBoxLayout, QPushButton, QGraphicsProxyWidget
 from PySide6.QtGui import QPixmap, QImage
 from PySide6.QtCore import Qt, QRectF, QThreadPool
+from PIL import Image, ImageDraw, ImageFont
 
 from image_calculate_positions_thread import ImageCalculatePositionsThread
 
@@ -32,35 +35,44 @@ class LazyImageViewer(QWidget):
 
         self.view.horizontalScrollBar().valueChanged.connect(self.update_visible_images)
 
+    # 이미지 이름 추가
     def image_center_text_add(self, path):
         filename = os.path.basename(path)
+        image_path = Path(path)
 
-        img = cv2.imread(path)
+        with open(image_path, "rb") as f:
+            file_bytes = np.asarray(bytearray(f.read()), dtype=np.uint8)
+        img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+
         if img is None:
             raise FileNotFoundError(f"{path} 파일이 없습니다.")
-
-        h, w, ch = img.shape[:3]
-
-        # 텍스트 설정
-        font = cv2.FONT_HERSHEY_SIMPLEX
-        font_scale = 2
-        thickness = 2
-        (text_w, text_h), baseline = cv2.getTextSize(
-            filename, font, font_scale, thickness)
-
-        center_x = (w - text_w) // 2
-        center_y = (h + text_h) // 2  # 왼쪽 아래 기준
-
-        # 중앙 텍스트 삽입
-        if (filename != "null_image.jpg"):
-            cv2.putText(img, filename, (center_x, center_y),
-                        font, font_scale, (0, 0, 0), thickness, cv2.LINE_AA)
-
-        # BGR → RGB
+        
         img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        qImg = QImage(img_rgb.data, w, h, w*ch, QImage.Format_RGB888)
-        return qImg
+        pil_img = Image.fromarray(img_rgb)
+        draw = ImageDraw.Draw(pil_img)
 
+        # 한글 폰트
+        font_path = "system/BATANG.TTC"
+        font = ImageFont.truetype(font_path, 30)
+
+        # textbbox로 텍스트 크기 계산
+        bbox = draw.textbbox((0, 0), filename, font=font)  # (x1, y1, x2, y2)
+        text_w = bbox[2] - bbox[0]
+        text_h = bbox[3] - bbox[1]
+
+        # 중앙 위치
+        img_w, img_h = pil_img.size
+        position = ((img_w - text_w)//2, (img_h - text_h)//2)
+
+        # 텍스트 삽입
+        draw.text(position, filename, font=font, fill=(0, 0, 0))
+
+        # 다시 QImage로 변환
+        img_np = np.array(pil_img)
+        h, w, ch = img_np.shape
+        qimg = QImage(img_np.data, w, h, w*ch, QImage.Format_RGB888)
+        return qimg
+    
     def calculate_positions(self, new_positions):
         self.positions = new_positions
         if self.positions:
@@ -108,6 +120,14 @@ class LazyImageViewer(QWidget):
                     item.setPos(x, y)
                     item.setData(0, self.image_paths[i])
                     self.loaded_items[i] = item
+
+                    btn = QPushButton("뷰어")
+                    proxy = QGraphicsProxyWidget()
+                    proxy.setWidget(btn)
+                    proxy.setParentItem(item)
+                    proxy.setPos(self.thumb_width -100, 10)
+
+                    btn.clicked.connect(lambda: os.startfile(self.image_paths[i]))
                 except Exception as e:
                     print(f"이미지 로드 오류: {e}")
 

@@ -6,5 +6,5 @@ app = QApplication(sys.argv)
 
 window = omr_gui()
 
-window.show()
+window.showMaximized()
 app.exec()
