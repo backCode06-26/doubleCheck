@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from extract_region import crop_roi
+from core.extract_region import crop_roi
 
 # import os
 

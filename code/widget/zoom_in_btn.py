@@ -2,7 +2,7 @@ from PySide6.QtWidgets import QWidget, QPushButton, QHBoxLayout, QButtonGroup
 
 
 class ZoomInBtn(QWidget):
-    def __init__(self, update_image_widht):
+    def __init__(self):
         super().__init__()
 
         layout = QHBoxLayout()

@@ -1,42 +1,28 @@
 import cv2
-import numpy as np
+from PIL import Image
+import imagehash
 
-# 1. 이미지 읽기 & 그레이스케일
-def phash_cv(img):
+# 이미지 읽기
+cv_img1 = cv2.imread(
+    r"C:\Users\hojin\OneDrive\Desktop\DoubleCheck\code\system\null_image.JPG")
+cv_img2 = cv2.imread(
+    r"C:\Users\hojin\OneDrive\Desktop\DoubleCheck\code\system\null_image.JPG")
 
-    if len(img.shape) != 2:
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+# BGR -> RGB 변환
+cv_img_rgb1 = cv2.cvtColor(cv_img1, cv2.COLOR_BGR2RGB)
+cv_img_rgb2 = cv2.cvtColor(cv_img2, cv2.COLOR_BGR2RGB)
 
-    # 2. 크기 조정
-    img = cv2.resize(img, (32, 32))
+# PIL 이미지로 변환
+pil_img1 = Image.fromarray(cv_img_rgb1)
+pil_img2 = Image.fromarray(cv_img_rgb2)
 
-    # 3. DCT 적용(저주파(큰 구조), 고주파(세부 구조))
-    dct = cv2.dct(np.float32(img))
+# pHash 계산
+hash1 = imagehash.phash(pil_img1)
+hash2 = imagehash.phash(pil_img2)
 
-    # 4. 상위 8x8 영역 추출 (저주파 추출)
-    dct_roi = dct[:8, :8]
+print("pHash 1:", hash1)
+print("pHash 2:", hash2)
 
-    # 5. 평균값 기준으로 0/1 결정
-    avg = dct_roi.mean() # 저주파의 평균값 구하기
-
-    # 저주파 영역에서 평균값보다 크면 True 작으면 False로 재구성합니다.
-    hash_array = dct_roi > avg
-
-    # 6. 64비트 해시 생성 (재구성된 배열을 1과 0으로 다시 재구성합니다.)
-    hash_str = ''.join(['1' if x else '0' for x in hash_array.flatten()])
-    hash = int(hash_str, 2)
-    return hash
-
-def compare_image(hash1, hash2):
-    diff = bin(hash1 ^ hash2).count("1")
-    similarity = 1 - (diff / 64)
-    return similarity
-
-
-first_img = cv2.imread("system/null_image.JPG")
-secoend_img = cv2.imread("system/null_image.JPG")
-
-hash1 = phash_cv(first_img)
-hash2 = phash_cv(secoend_img)
-
-print(compare_image(hash1, hash2))
+# pHash 차이 계산 (해밍 거리)
+diff = hash1 - hash2
+print("두 이미지의 pHash 차이:", diff)

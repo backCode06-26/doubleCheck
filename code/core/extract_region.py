@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 from collections import namedtuple
-from rotate_correction import correct_skew
+from .rotate_correction import correct_skew
 
 
 # import os

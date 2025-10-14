@@ -1,0 +1,6 @@
+{
+    "python.analysis.extraPaths": [
+        "./code/widget/layout",
+        "./code/widget/layout"
+    ]
+}

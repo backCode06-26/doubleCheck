@@ -8,7 +8,7 @@ from PySide6.QtGui import QPixmap, QImage
 from PySide6.QtCore import Qt, QRectF, QThreadPool
 from PIL import Image, ImageDraw, ImageFont
 
-from image_calculate_positions_thread import ImageCalculatePositionsThread
+from thread.image_calculate_positions_thread import ImageCalculatePositionsThread
 
 
 class LazyImageViewer(QWidget):
@@ -35,44 +35,6 @@ class LazyImageViewer(QWidget):
 
         self.view.horizontalScrollBar().valueChanged.connect(self.update_visible_images)
 
-    # 이미지 이름 추가
-    def image_center_text_add(self, path):
-        filename = os.path.basename(path)
-        image_path = Path(path)
-
-        with open(image_path, "rb") as f:
-            file_bytes = np.asarray(bytearray(f.read()), dtype=np.uint8)
-        img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
-
-        if img is None:
-            raise FileNotFoundError(f"{path} 파일이 없습니다.")
-        
-        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        pil_img = Image.fromarray(img_rgb)
-        draw = ImageDraw.Draw(pil_img)
-
-        # 한글 폰트
-        font_path = "system/BATANG.TTC"
-        font = ImageFont.truetype(font_path, 30)
-
-        # textbbox로 텍스트 크기 계산
-        bbox = draw.textbbox((0, 0), filename, font=font)  # (x1, y1, x2, y2)
-        text_w = bbox[2] - bbox[0]
-        text_h = bbox[3] - bbox[1]
-
-        # 중앙 위치
-        img_w, img_h = pil_img.size
-        position = ((img_w - text_w)//2, (img_h - text_h)//2)
-
-        # 텍스트 삽입
-        draw.text(position, filename, font=font, fill=(0, 0, 0))
-
-        # 다시 QImage로 변환
-        img_np = np.array(pil_img)
-        h, w, ch = img_np.shape
-        qimg = QImage(img_np.data, w, h, w*ch, QImage.Format_RGB888)
-        return qimg
-    
     def calculate_positions(self, new_positions):
         self.positions = new_positions
         if self.positions:
@@ -113,21 +75,28 @@ class LazyImageViewer(QWidget):
             item_rect = QRectF(x, y, self.thumb_width, h)
             if rect.intersects(item_rect):
                 try:
-                    qimg = self.image_center_text_add(self.image_paths[i])
-                    pixmap = QPixmap.fromImage(qimg).scaledToWidth(
-                        self.thumb_width, Qt.SmoothTransformation)
+                    image_path = self.image_paths[i]
+
+                    pixmap = QPixmap(image_path).scaledToWidth(
+                        self.thumb_width, Qt.SmoothTransformation
+                    )
                     item = self.scene.addPixmap(pixmap)
                     item.setPos(x, y)
-                    item.setData(0, self.image_paths[i])
+                    item.setData(0, image_path)
                     self.loaded_items[i] = item
+
+                    filename = os.path.basename(image_path)
+                    if filename == "null_image.jpg":
+                        return
 
                     btn = QPushButton("뷰어")
                     proxy = QGraphicsProxyWidget()
                     proxy.setWidget(btn)
                     proxy.setParentItem(item)
-                    proxy.setPos(self.thumb_width -100, 10)
+                    proxy.setPos(self.thumb_width - 100, 10)
 
-                    btn.clicked.connect(lambda: os.startfile(self.image_paths[i]))
+                    btn.clicked.connect(
+                        lambda checked, path=image_path: os.startfile(path))
                 except Exception as e:
                     print(f"이미지 로드 오류: {e}")
 

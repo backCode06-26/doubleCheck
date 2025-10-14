@@ -8,11 +8,11 @@ class SelectBtns(QWidget):
         self.btn2.setStyleSheet("border: none; padding: 0px 5px;")
         self.btn3.setStyleSheet("border: none; padding: 0px 5px;")
 
-    def __init__(self, change_images):
+    def __init__(self, change_image):
         super().__init__()
 
         layout = QHBoxLayout(self)
-        self.change_image = change_images
+        self.change_image = change_image
 
         # 버튼 생성
         self.btn1 = QPushButton("전체 답안")
@@ -53,3 +53,6 @@ class SelectBtns(QWidget):
 
         btn_type = button.property("type")
         self.change_image(btn_type)
+
+    def setChangeImageDef(self, change_image):
+        self.change_image = change_image

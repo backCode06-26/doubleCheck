@@ -1,7 +1,8 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QSlider,
     QPushButton, QLabel,
-    QFileDialog, QFrame, QProgressBar
+    QFileDialog, QFrame, QProgressBar,
+    QGraphicsScene
 )
 
 from PySide6.QtCore import Qt, QThreadPool
@@ -9,11 +10,12 @@ from PySide6.QtGui import QFont
 
 import os
 
-from viewport_image_loader import LazyImageViewer
-from graphics_view import GraphicsScene
-from work_thread import ImageProcessRunnable
-from select_btns import SelectBtns
-from zoom_in_btn import ZoomInBtn
+from thread.work_thread import ImageProcessRunnable
+from .viewport_image_loader import LazyImageViewer
+from .value_slider import ValueSlider
+from .select_btns import SelectBtns
+from .zoom_in_btn import ZoomInBtn
+import core.folder_processing as fp
 
 
 class omr_gui(QWidget):
@@ -38,17 +40,18 @@ class omr_gui(QWidget):
         self.setWindowTitle("OMR 이중 급지")
         self.resize(1500, 1200)
 
+        # main_layout 레이아웃
         main_layout = QHBoxLayout()
 
-        # main_right_layout 설정
+        # right_section_layout 설정
         main_right_layout = QVBoxLayout()
         main_right_layout.setContentsMargins(20, 20, 20, 20)
         main_right_layout.setSpacing(10)
 
-        # top_layout
+        # main_section_layout 설정
         top_layout = QVBoxLayout()
 
-        # top_t_layout 추가
+        # header_layout 추가
         top_t_layout = QVBoxLayout()
 
         # top_t_r_btn 추가
@@ -56,10 +59,11 @@ class omr_gui(QWidget):
         top_t_t_btn.setStyleSheet("padding: 5px 8px; font-size: 16px;")
         top_t_t_btn.clicked.connect(self.select_folder)
 
+        # nav_layout 추가
         top_t_b_layout = QHBoxLayout()
 
         self.top_t_b_btn = SelectBtns(self.change_images)
-        self.top_t_b_zoom_btn = ZoomInBtn(self.update_image_width)
+        self.top_t_b_zoom_btn = ZoomInBtn()
 
         top_t_b_layout.addWidget(self.top_t_b_btn, 6)
         top_t_b_layout.addStretch(15)
@@ -68,12 +72,12 @@ class omr_gui(QWidget):
         top_t_layout.addWidget(top_t_t_btn)
         top_t_layout.addLayout(top_t_b_layout)
 
-        # top_b_layout 추가
+        # section_layout 추가
         top_b_layout = QVBoxLayout()
 
         # top_b_layout_scroll 추가
         self.top_b_layout_scroll = LazyImageViewer()
-        self.view = GraphicsScene(self.top_b_layout_scroll.scene)
+        self.view = QGraphicsScene(self.top_b_layout_scroll.scene)
 
         # left_layout 위젯 추가
         top_b_layout.addWidget(self.top_b_layout_scroll)
@@ -85,61 +89,45 @@ class omr_gui(QWidget):
         # main_right_layout layout 추가
         main_right_layout.addLayout(top_layout)
 
-        # bottom_layout
+        # footer_layout
         bottom_layout = QVBoxLayout()
 
-        # bottom_top_layout (구분선 레이아웃)
-        bt_layout = QHBoxLayout()
+        # footer_process_layout (프로그레스 바 레이아웃)
+        footer_process_layout = QHBoxLayout()
 
-        # 위선
-        t_line = QFrame()
-        t_line.setFrameShape(QFrame.HLine)
-
-        bt_layout.addWidget(t_line)
-
-        # 중간 레이아웃
-        btc_layout = QVBoxLayout()
-
-        # 비교 이미지 레이아웃
-        btc_sub_t_layout = QHBoxLayout()
-
+        # 프로그레스 바 관련 라벨
         main_title = QLabel("이미지 비교 진행률")
-        btc_sub_t_layout.addWidget(main_title)
 
-        self.bt_main_process = QProgressBar()
-        # self.bt_main_process.minimumSize(0)
-        btc_sub_t_layout.addWidget(self.bt_main_process)
+        # 프로그레스 바
+        self.main_process = QProgressBar()
+        self.main_process.setMinimum(1)
+        self.main_process.setMaximum(100)
 
-        btc_layout.addLayout(btc_sub_t_layout)
+        footer_process_layout.addWidget(main_title)
+        footer_process_layout.addWidget(self.main_process)
 
-        bt_layout.addLayout(btc_layout)
-
-        # 아래선
-        b_line = QFrame()
-        b_line.setFrameShape(QFrame.HLine)
-
-        bt_layout.addWidget(b_line)
-
-        # bottom_bottom_layout (프로그램 조작 버튼)
+        # btn_controll_layout (프로그램 조작 버튼)
         bb_layout = QHBoxLayout()
 
-        # center
+        # btn_container_layout
         bb_center_layout = QHBoxLayout()
 
         # 검사하기 버튼은 main_labels의 값만을 검사하며, main_labels에 들어가는값은
-        center_btn = QPushButton("이중 급지 검사")
-        center_btn.clicked.connect(self.image_progress)
+        center_submit_btn = QPushButton("이중 급지 검사")
+        center_submit_btn.clicked.connect(self.image_progress)
+        center_submit_btn.setFixedWidth(150)
 
         center_setting_btn = QPushButton("설정")
         center_setting_btn.clicked.connect(
             lambda: self.toggle_main_left_layout(self.main_left_layout))
+        center_setting_btn.setFixedWidth(150)
 
         # center_checkbox = QCheckBox("과정 표시")
         # center_checkbox.stateChanged.connect(
         #     lambda state: self.on_checkbox_change(state))
 
         # center_layout 위젯 추가
-        bb_center_layout.addWidget(center_btn)
+        bb_center_layout.addWidget(center_submit_btn)
         bb_center_layout.addWidget(center_setting_btn)
 
         # bottom layout layout 추가
@@ -147,63 +135,70 @@ class omr_gui(QWidget):
         bb_layout.addLayout(bb_center_layout, 1)
         bb_layout.addStretch(1)
 
-        bottom_layout.addLayout(bt_layout)
+        bottom_layout.addLayout(footer_process_layout)
         bottom_layout.addLayout(bb_layout)
 
         # main_right_layout layout 추가
         main_right_layout.addLayout(bottom_layout)
 
-        # 답안의 수를 표시하는 위젯
+        # left_section_layout
+        container = QWidget()
+        container.setMaximumWidth(250)
+        container.setMaximumWidth(150)
+
+        # sub_section_layout 레이아웃
         self.main_left_layout = QVBoxLayout()
-        main_left_all_lebal = QLabel("전체 답안 수")
-        self.main_left_all_count = QLabel("0 장")
+        try:
+            main_left_all_lebal = QLabel("전체 답안 수")
+            self.main_left_all_btn = QPushButton("전체 답안 보기")
+            self.main_left_all_btn.clicked.connect(
+                lambda: os.startfile(self.existing_path))
+            self.main_left_all_count = QLabel("0 장")
 
-        main_left_blank_lebal = QLabel("백지 답안 수")
-        self.main_left_blank_count = QLabel("0 장")
+            main_left_blank_lebal = QLabel("백지 답안 수")
+            self.main_left_blank_btn = QPushButton("백지 답안 보기")
+            self.main_left_blank_btn.clicked.connect(
+                lambda: os.startfile(os.path.join(self.existing_path, "blank")))
+            self.main_left_blank_count = QLabel("0 장")
 
-        main_left_double_lebal = QLabel("중복 답안 수")
-        self.main_left_double_count = QLabel("0 장")
+            main_left_double_lebal = QLabel("중복 답안 수")
+            self.main_left_double_btn = QPushButton("중복 답안 보기")
+            self.main_left_double_btn.clicked.connect(
+                lambda: os.startfile(os.path.join(self.existing_path, "double")))
+            self.main_left_double_count = QLabel("0 장")
+        except Exception:
+            print("이중 급지를 판단하기 위한 폴터를 선택해주세요")
 
-        # 이미지 비교에 필요한 hash값을 정하는 위젯
-        self.main_left_slider = QSlider(Qt.Horizontal)
-        self.main_left_slider.setMinimum(0)
-        self.main_left_slider.setMaximum(100)
-        self.main_left_slider.setSingleStep(1)
-        self.main_left_slider.setFixedWidth(80)
-
-        # 현재 hash값을 표시하는 라벨
-        self.main_left_slider.valueChanged.connect(self.on_value_change)
-        self.main_left_slider_label = QLabel("현재 Hash값: 0")
-        self.main_left_slider_label.setProperty("hash_value", 0)
+        # 기준이 되는 Hash값을 받기 위한 입력폼
+        self.hash_slider = ValueSlider()
 
         # 레이아웃에 추가
         self.main_left_layout.addStretch(1)
         self.main_left_layout.addWidget(main_left_all_lebal)
+        self.main_left_layout.addWidget(self.main_left_all_btn)
         self.main_left_layout.addWidget(self.main_left_all_count)
         self.main_left_layout.addStretch(2)
 
         self.main_left_layout.addWidget(main_left_blank_lebal)
+        self.main_left_layout.addWidget(self.main_left_blank_btn)
         self.main_left_layout.addWidget(self.main_left_blank_count)
         self.main_left_layout.addStretch(2)
 
         self.main_left_layout.addWidget(main_left_double_lebal)
+        self.main_left_layout.addWidget(self.main_left_double_btn)
         self.main_left_layout.addWidget(self.main_left_double_count)
         self.main_left_layout.addStretch(2)
-        
-        self.main_left_layout.addWidget(self.main_left_slider)
-        self.main_left_layout.addWidget(self.main_left_slider_label)
+
+        self.main_left_layout.addWidget(self.hash_slider)
 
         self.main_left_layout.addStretch(12)
 
+        container.setLayout(self.main_left_layout)
+
         main_layout.addLayout(main_right_layout)
-        main_layout.addLayout(self.main_left_layout)
+        main_layout.addWidget(container)
 
         self.setLayout(main_layout)
-
-    def on_value_change(self, value):
-        float_value = value / 10  # 다시 0.1 단위로 변환
-        self.main_left_slider_label.setText(f"현재 Hash값: {float_value:.1f}")
-        self.main_left_slider_label.setProperty("hash_value", float_value)
 
     def set_main_paths(self, paths):
         self.main_images = paths
@@ -220,7 +215,7 @@ class omr_gui(QWidget):
     def set_double_paths(self, paths):
         self.double_images = paths
 
-        double_images_count = len(self.main_images)
+        double_images_count = len(self.double_images)
         self.main_left_double_count.setText(f"{double_images_count} 장")
 
     def toggle_main_left_layout(self, layout):
@@ -272,6 +267,9 @@ class omr_gui(QWidget):
                 # 새로운 경로 선택
                 self.existing_path = self.new_folder_path
 
+                # 폴더 초기화, 중복, 백지 폴더 생성
+                fp.folder_processing(self.existing_path)
+
                 # 받은 폴더 경로로 이미지의 경로들을 만듭니다.
                 # IMAGE_EXTENSIONS의 허용된 확장자를 가진 이미지만 허용하게 합니다.
                 IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".bmp")
@@ -293,8 +291,8 @@ class omr_gui(QWidget):
                 # 이미지 변경 및 현재 경로 저장
                 self.update_image(self.main_images)
 
-    def update_image_width(self, mode):
-        self.top_b_layout_scroll.update_width(mode, self.main_images)
+    # def update_image_width(self, mode):
+    #     self.top_b_layout_scroll.update_width(mode, self.main_images)
 
     # 백지, 중복 답안 저장 함수
     def save_image(self, paths, mode):
@@ -320,15 +318,22 @@ class omr_gui(QWidget):
 
         # 모드에 따라서 저장한 배열을 따로 지정합니다.
         if mode == "blank":
+
+            # 백지 답안 처리
             self.set_blank_paths(new_paths)
+            fp.image_copys(self.existing_path, "blank", new_paths)
         elif mode == "double":
+
+            # 중복 답안 처리
             self.set_double_paths(new_paths)
+            fp.image_copys(self.existing_path, "double", new_paths)
         else:
             raise ValueError("mode는 'blank' 또는 'double'이어야 합니다.")
 
+    # 프로그레스 바 증가 함수
     def update_progress(self, type):
 
-        process_bar = self.bt_main_process
+        process_bar = self.main_process
         current = process_bar.value()
 
         if (type == 0):
@@ -336,9 +341,10 @@ class omr_gui(QWidget):
         elif (type == 1):
             process_bar.setValue(current + 1)
 
+    # 프로그레스 바 마지막 처리 함수
     def last_progress(self):
 
-        process_bar = self.bt_main_process
+        process_bar = self.main_process
         current = process_bar.value()
         maxnum = process_bar.maximum()
 
@@ -346,31 +352,24 @@ class omr_gui(QWidget):
         print("작업 완료!")
 
     # 과정표시 체크박스의 함수
-    def on_checkbox_change(self, state):
+    # def on_checkbox_change(self, state):
 
-        if state == 2:
-            self.is_check = False
-        else:
-            self.is_check = True
-
-    # 해시 값 반환함수
-    def get_hash_value(self):
-        hash_value = self.main_left_slider_label.property("hash_value")
-        return hash_value
+    #     if state == 2:
+    #         self.is_check = False
+    #     else:
+    #         self.is_check = True
 
     # 검사 실행 함수
     def image_progress(self):
-        self.bt_main_process.setValue(0)
-        hash_value = self.get_hash_value()
+        self.main_process.setValue(0)
+        # 현재 기준 hash 반환
+        hash_value = self.hash_slider.get_hash_value()
 
         if self.existing_path:
             self.thread_pool = QThreadPool.globalInstance()
 
             self.current_runnable = ImageProcessRunnable(
                 self.existing_path, hash_value, batch_size=5)
-
-            self.current_runnable.signals.finished.connect(
-                lambda: self.last_progress())
 
             # 시그널 연결 (.signals를 통해)
             self.current_runnable.signals.progress.connect(
@@ -383,11 +382,14 @@ class omr_gui(QWidget):
 
             # 진행률의 최대값 구하기
             self.current_runnable.signals.max_main_progress.connect(
-                lambda c: self.bt_main_process.setMaximum(c))
+                lambda cnt: self.bt_main_process.setMaximum(cnt))
 
             # 진행률의 값 조작하기
             self.current_runnable.signals.update_main_progress.connect(
-                lambda c: self.update_progress(c))
+                lambda cnt: self.update_progress(cnt))
+
+            self.current_runnable.signals.finished.connect(
+                lambda: self.last_progress())
 
             # 스레드풀에서 실행
             self.thread_pool.start(self.current_runnable)

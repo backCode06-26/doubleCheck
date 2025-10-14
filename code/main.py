@@ -1,5 +1,5 @@
 from PySide6.QtWidgets import QApplication
-from omr_gui import omr_gui
+from widget.omr_gui import omr_gui
 import sys
 
 app = QApplication(sys.argv)

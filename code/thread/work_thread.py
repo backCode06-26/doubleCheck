@@ -1,12 +1,13 @@
-
 import os
 import cv2
-import numpy as np
-from blank_checker import is_blank_page
+import time
+from PIL import Image
+import imagehash
+from core.blank_checker import is_blank_page
 from PySide6.QtCore import QObject, Signal, QRunnable
 from skimage.metrics import structural_similarity as ssim
 
-from rotate_correction import correct_skew
+from core.rotate_correction import correct_skew
 
 IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".bmp")
 
@@ -34,32 +35,7 @@ class ImageProcessRunnable(QRunnable):
 
     def run(self):
 
-        def phash_cv(img):
-
-            # 2. 크기 조정
-            img = cv2.resize(img, (32, 32))
-
-            # 3. DCT 적용(저주파(큰 구조), 고주파(세부 구조))
-            dct = cv2.dct(np.float32(img))
-
-            # 4. 상위 8x8 영역 추출 (저주파 추출)
-            dct_roi = dct[:8, :8]
-
-            # 5. 평균값 기준으로 0/1 결정
-            avg = dct_roi.mean() # 저주파의 평균값 구하기
-
-            # 저주파 영역에서 평균값보다 크면 True 작으면 False로 재구성합니다.
-            hash_array = dct_roi > avg
-
-            # 6. 64비트 해시 생성 (재구성된 배열을 1과 0으로 다시 재구성합니다.)
-            hash_str = ''.join(['1' if x else '0' for x in hash_array.flatten()])
-            hash = int(hash_str, 2)
-            return hash
-
-        def compare_image(hash1, hash2):
-            diff = bin(hash1 ^ hash2).count("1")
-            similarity = 1 - (diff / 64)
-            return similarity
+        self.main_start = time.time()
 
         self.blank_paths = []
         self.blank_sceen = set()
@@ -88,6 +64,8 @@ class ImageProcessRunnable(QRunnable):
         # 비교 이미지
         main_idx = 0
         while main_idx < len(share_list):
+            self.file_start = time.time()
+
             i = share_list[main_idx]
 
             # 비교할 이미지의 최대값
@@ -157,16 +135,25 @@ class ImageProcessRunnable(QRunnable):
 
                 first_img = first_img[0:h, 0:w]
                 second_img = second_img[0:h, 0:w]
-                
-                # 이미지 해쉬 변환
-                first_hash = phash_cv(first_img)
-                second_hash = phash_cv(second_img)
+
+                # cv2 -> pli 변환, 이미지 해쉬 구하기
+                def getImageHash(img):
+                    cv_img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                    pil_img = Image.fromarray(cv_img_rgb)
+                    hash = imagehash.phash(pil_img)
+
+                    return hash
+
+                hash1 = getImageHash(first_img)
+                hash2 = getImageHash(second_img)
 
                 # 이미지 정확도 계산
-                hamming_distance = compare_image(first_hash, second_hash)
+                hamming_distance = hash1 - hash2
+                print("계산된 hash값: ", hamming_distance)
+                print("기준 hash값: ", self.hash_value)
 
                 # 이 해시값 GUI에서 받아야함
-                if hamming_distance >= self.hash_value:
+                if hamming_distance <= self.hash_value:
 
                     score = ssim(first_img, second_img, full=False)
                     print(score)
@@ -192,7 +179,15 @@ class ImageProcessRunnable(QRunnable):
             # 비교 진행도 추가
             self.signals.update_main_progress.emit(1)
 
+            self.file_end = time.time()
+            self.signals.progress.emit(
+                f"\n\n파일 처리 시간 {self.file_end - self.file_start}\n\n")
+
+        self.main_end = time.time()
+
         self.signals.blank_images.emit(self.blank_paths)
         self.signals.double_images.emit(self.double_paths)
         self.signals.finished.emit()
         self.signals.progress.emit("검사완료")
+        self.signals.progress.emit(
+            f"\n\n전체 처리 시간{self.main_end - self.main_start}")

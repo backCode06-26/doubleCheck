@@ -1,0 +1,1 @@
+"C:\Users\hojin\OneDrive\Desktop\DoubleCheck\venv\Scripts\python.exe" "C:\Users\hojin\OneDrive\Desktop\DoubleCheck\code\main.py"
