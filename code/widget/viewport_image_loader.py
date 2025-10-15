@@ -1,12 +1,8 @@
 import math
 import os
-import cv2
-import numpy as np
-from pathlib import Path
 from PySide6.QtWidgets import QWidget, QGraphicsView, QGraphicsScene, QVBoxLayout, QPushButton, QGraphicsProxyWidget
-from PySide6.QtGui import QPixmap, QImage
+from PySide6.QtGui import QPixmap, QTransform
 from PySide6.QtCore import Qt, QRectF, QThreadPool
-from PIL import Image, ImageDraw, ImageFont
 
 from thread.image_calculate_positions_thread import ImageCalculatePositionsThread
 
@@ -86,7 +82,7 @@ class LazyImageViewer(QWidget):
                     self.loaded_items[i] = item
 
                     filename = os.path.basename(image_path)
-                    if filename == "null_image.jpg":
+                    if filename == "null_image.JPG":
                         return
 
                     btn = QPushButton("뷰어")
@@ -100,19 +96,16 @@ class LazyImageViewer(QWidget):
                 except Exception as e:
                     print(f"이미지 로드 오류: {e}")
 
-    def update_width(self, mode, current_paths):
-        if mode == '+':
-            self.thumb_width += 100
-        elif mode == '-':
-            self.thumb_width -= 100
-
-        self.update_images(current_paths)
+    def scale_view(self, factor):
+        t = QTransform()
+        t.scale(factor, factor)
+        self.view.setTransform(t)
 
     def update_images(self, new_paths):
         self.scene.clear()
         self.loaded_items = {}
 
-        self.image_paths = new_paths or ['system/null_image.jpg']
+        self.image_paths = new_paths
         self.col = len(self.image_paths)
 
         self.calculate_image_positions()

@@ -3,11 +3,6 @@ from PySide6.QtWidgets import QWidget, QPushButton, QHBoxLayout, QButtonGroup
 
 class SelectBtns(QWidget):
 
-    def remove_border(self):
-        self.btn1.setStyleSheet("border: none; padding: 0px 5px;")
-        self.btn2.setStyleSheet("border: none; padding: 0px 5px;")
-        self.btn3.setStyleSheet("border: none; padding: 0px 5px;")
-
     def __init__(self, change_image):
         super().__init__()
 
@@ -16,7 +11,7 @@ class SelectBtns(QWidget):
 
         # 버튼 생성
         self.btn1 = QPushButton("전체 답안")
-        self.btn1.setProperty("type", "all")
+        self.btn1.setProperty("type", "main")
 
         self.btn2 = QPushButton("백지 답안")
         self.btn2.setProperty("type", "blank")
@@ -25,6 +20,7 @@ class SelectBtns(QWidget):
         self.btn3.setProperty("type", "double")
 
         self.remove_border()
+        self.btn1.setStyleSheet("border-bottom: 1px solid white")
 
         # 버튼 그룹 생성 (exclusive=True로 단일 선택)
         self.group = QButtonGroup()
@@ -42,9 +38,10 @@ class SelectBtns(QWidget):
 
         self.setLayout(layout)
 
-    def on_first_button_clicked(self):
-        self.remove_border()
-        self.btn1.setStyleSheet("border-bottom: 1px solid white")
+    def remove_border(self):
+        self.btn1.setStyleSheet("border: none; padding: 0px 5px;")
+        self.btn2.setStyleSheet("border: none; padding: 0px 5px;")
+        self.btn3.setStyleSheet("border: none; padding: 0px 5px;")
 
     def on_button_clicked(self, button):
         self.remove_border()
@@ -53,6 +50,3 @@ class SelectBtns(QWidget):
 
         btn_type = button.property("type")
         self.change_image(btn_type)
-
-    def setChangeImageDef(self, change_image):
-        self.change_image = change_image

@@ -181,7 +181,7 @@ class ImageProcessRunnable(QRunnable):
 
             self.file_end = time.time()
             self.signals.progress.emit(
-                f"\n\n파일 처리 시간 {self.file_end - self.file_start}\n\n")
+                f"\n\n파일 처리 시간 {self.file_end - self.file_start:4f}초\n\n")
 
         self.main_end = time.time()
 
@@ -190,4 +190,4 @@ class ImageProcessRunnable(QRunnable):
         self.signals.finished.emit()
         self.signals.progress.emit("검사완료")
         self.signals.progress.emit(
-            f"\n\n전체 처리 시간{self.main_end - self.main_start}")
+            f"\n\n전체 처리 시간 {self.main_end - self.main_start:4f}초")
