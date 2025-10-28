@@ -1,0 +1,1 @@
+pyinstaller --icon "dist\images\icon\double_check_icon.ico" --onefile --name "Double Check" main.py
