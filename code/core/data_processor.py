@@ -3,7 +3,7 @@ import sys
 import json
 import config
 
-def data_processing(folder_path):
+def dataProcessing(folder_path):
 
     # 폴더 생성
     output_folder_path = os.path.join(folder_path, "data")

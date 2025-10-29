@@ -1,73 +1,67 @@
 from PySide6.QtCore import QObject, Signal, QRunnable, Slot
 from concurrent.futures import ThreadPoolExecutor
-
-import os
-import cv2
+from code.process.image_processor import ImageProcessor
 import config
-import numpy as np
-import imagehash
-from PIL import Image
-from multiprocessing import Pool
-from code.core.blank_checker import isBlankImage
-from code.core.rotate_correction import correct_skew
-from code.core.data_processor import saveJson
+import time
+
 
 class ImagePreprocessingSingnals(QObject):
     progress = Signal(str)
     error = Signal(str)
-    complete = Signal()
+    result = Signal(list)
     finished = Signal()
 
-def run_processing(image_paths):
-    black_image_paths = []
-    with ThreadPoolExecutor(max_workers=config.core_count) as executor:
-        results = list(executor.map(ImageProcessor._process_single_image, image_paths))
-    saveJson(results, "data")
-            
-class ImageProcessor:
 
-    @staticmethod
-    def getSafeImgLoad(img_path):
-        with open(img_path, "rb") as f:
-            file_bytes = np.asarray(bytearray(f.read()), dtype=np.uint8)
-            img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
-        return img
+def process_image_wrapper(path):
+    """pickle 가능한 전역 함수"""
+    return ImageProcessor._process_single_image(path)
 
-    @staticmethod
-    def cv2ToPIL(img):
-        cv_img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        pil_img = Image.fromarray(cv_img_rgb)
-        return pil_img
-    
-    @staticmethod
-    def _process_single_image(path):
-        img = ImageProcessor.getSafeImgLoad(path)
 
-        file_name = os.path.basename(path)
-        ouput_folder_path = config.OUTPUT_FOLDER_PATH
+class ImagePreprocessingRunnable(QRunnable):
+    def __init__(self, image_paths, max_workers=4):
+        super().__init__()
+        self.signals = ImagePreprocessingSingnals()
+        self.image_paths = image_paths
+        self.max_workers = max_workers
 
-        pre_img = correct_skew(img)
-        
-        output_path = os.path.join(ouput_folder_path, file_name)
-        print(output_path)
-        ImageProcessor.saveImage(pre_img, output_path)
+    @Slot()
+    def run(self):
+        try:
 
-        image_hash = ImageProcessor.getImageHash(pre_img)
-        is_blank = isBlankImage(pre_img)
+            self.signals.progress.emit("이미지 전처리를 시작합니다.")
 
-        return {
-            "pre_img" : output_path, 
-            "image_hash" : image_hash, 
-            "is_blank" : is_blank
-        }
-    @staticmethod
-    def getImageHash(img):
-        pil_img = ImageProcessor.cv2ToPIL(img)
-        hash_value = imagehash.phash(pil_img)
-        return hash_value
-    
-    @staticmethod
-    def saveImage(img, output_path):
-        pil_img = ImageProcessor.cv2ToPIL(img)
-        img_gray = pil_img.convert('L')
-        img_gray.save(output_path)
+            results = []
+            total = len(self.image_paths)
+
+            # 멀티프로세싱으로 병렬 처리
+            with ThreadPoolExecutor(max_workers=config.core_count) as executor:
+                # 모든 작업을 한 번에 제출
+                futures = {
+                    executor.submit(process_image_wrapper, path): path
+                    for path in self.image_paths
+                }
+
+                # 완료된 작업부터 순차적으로 수집
+                start_time = time.time()
+
+                from concurrent.futures import as_completed
+                for idx, future in enumerate(as_completed(futures), 1):
+                    try:
+                        image_data = future.result()
+                        results.append(image_data)
+                        self.signals.progress.emit(f"{idx}/{total} 이미지 전처리 완료")
+                    except Exception as e:
+                        self.signals.error.emit(f"이미지 처리 오류: {str(e)}")
+
+                end_time = time.time()
+
+                work_time = end_time - start_time
+
+            self.signals.progress.emit("전체 이미지 처리를 완료하였습니다.")
+            self.signals.progress.emit(f"작업에 걸린 시간: {work_time}")
+            config.all_time += work_time
+            self.signals.result.emit(results)
+            self.signals.finished.emit()
+
+        except Exception as e:
+            self.signals.error.emit(str(e))

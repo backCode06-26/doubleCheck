@@ -1,7 +1,9 @@
 import os
 import cv2
 import time
+import config
 from PySide6.QtCore import QObject, Signal, QRunnable
+from code.process.image_processor import ImageProcessor
 from skimage.metrics import structural_similarity as ssim
 
 IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".bmp")
@@ -32,12 +34,6 @@ class ImageProcessRunnable(QRunnable):
 
         self.main_start = time.time()
 
-        self.blank_paths = []
-        self.blank_sceen = set()
-
-        self.double_paths = []
-        self.double_sceen = set()
-
         self.signals.progress.emit("검사시작")
 
         if not self.folder_path:
@@ -45,75 +41,59 @@ class ImageProcessRunnable(QRunnable):
             self.signals.finished.emit()
             return
 
-        # 이미지 파일 리스트
-        image_files = [
-            f for f in os.listdir(self.folder_path)
-            if f.lower().endswith(IMAGE_EXTENSIONS)
-        ]
+        share_list = config.current_json["data"]
+        total = len(share_list)
+        blank_image_set = set()
+        double_image_set = set()
 
-        # 이미지의 전체 개수
-        total = len(image_files)
-
-        share_list = list(range(1, total, 2))
+        blank_image_list = []
+        double_image_list = []
 
         # 비교 이미지
-        main_idx = 0
-        while main_idx < len(share_list):
+        for i in range(total):
             self.file_start = time.time()
 
-            i = share_list[main_idx]
-
-            # 비교할 이미지의 최대값
-            self.signals.max_main_progress.emit(len(list(range(1, total, 2))))
-
-            first_path = os.path.join(
-                self.folder_path, image_files[i]).replace("\\", "/")
+            first_data = share_list[i]
+            first_input_path, first_image_hash, first_is_blank, first_pre_path = (
+                first_data["input_path"],
+                ImageProcessor.textToHash(first_data["image_hash"]),
+                first_data["is_blank"],
+                first_data["pre_path"]
+            )
 
             # 첫 이미지 백지 체크
-            if is_blank_page(first_path):
+            if first_is_blank or (first_input_path in blank_image_set):
 
-                if image_files[i] in self.blank_sceen:
-                    continue
-
-                share_list.pop(main_idx)
-
-                self.signals.progress.emit(f"{image_files[i]}: 백지답안")
-                self.blank_paths.append(image_files[i])
-                self.blank_sceen.add(image_files[i])
-
-                # 비교 진행도 초기화
-                self.signals.update_main_progress.emit(1)
+                if not (first_input_path in blank_image_set):
+                    blank_image_set.add(first_input_path)
+                    blank_image_list.append(first_input_path)
+                    self.signals.progress.emit(f"{first_input_path}: 백지답안")
                 continue
 
             # 대조 이미지
-            sub_idx = main_idx+1
-            while sub_idx < len(share_list):
-                j = share_list[sub_idx]
+            for j in range(i+1, total):
+                second_data = share_list[j]
+                second_input_path, second_image_hash, second_is_blank, second_pre_path = (
+                    second_data["input_path"],
+                    ImageProcessor.textToHash(second_data["image_hash"]),
+                    second_data["is_blank"],
+                    second_data["pre_path"]
+                )
 
-                second_path = os.path.join(
-                    self.folder_path, image_files[j]).replace("\\", "/")
+                if second_is_blank or (second_input_path in blank_image_set):
 
-                if is_blank_page(second_path):
-
-                    if image_files[j] in self.blank_sceen:
-                        continue
-
-                    share_list.pop(sub_idx)
-
-                    self.signals.progress.emit(f"{image_files[j]}: 백지답안")
-                    self.blank_paths.append(image_files[j])
-                    self.blank_sceen.add(image_files[j])
-
+                    if not (second_input_path in blank_image_set):
+                        blank_image_set.add(second_input_path)
+                        blank_image_list.append(second_input_path)
+                        self.signals.progress.emit(
+                            f"{second_input_path}: 백지답안")
                     continue
 
                 try:
-                    origin_first_img = correct_skew(first_path)
-                    first_img = cv2.cvtColor(
-                        origin_first_img, cv2.COLOR_RGB2GRAY)
-
-                    origin_second_img = correct_skew(second_path)
-                    second_img = cv2.cvtColor(
-                        origin_second_img, cv2.COLOR_RGB2GRAY)
+                    first_img = ImageProcessor.getSafeImgLoad(
+                        first_pre_path)
+                    second_img = ImageProcessor.getSafeImgLoad(
+                        second_pre_path)
 
                 except Exception as e:
                     self.signals.progress.emit(f"처리 중 오류 {e}")
@@ -121,7 +101,7 @@ class ImageProcessRunnable(QRunnable):
 
                 if first_img is None or second_img is None:
                     self.signals.progress.emit(
-                        f"{image_files[i]} 또는 {image_files[j]} 이미지 없음")
+                        f"{first_input_path} 또는 {second_input_path} 이미지 없음")
 
                     continue
 
@@ -132,46 +112,44 @@ class ImageProcessRunnable(QRunnable):
                 second_img = second_img[0:h, 0:w]
 
                 # 이미지 정확도 계산
-                hamming_distance = hash1 - hash2
+                hamming_distance = first_image_hash - second_image_hash
                 print("계산된 hash값: ", hamming_distance)
                 print("기준 hash값: ", self.hash_value)
 
                 # 이 해시값 GUI에서 받아야함
                 if hamming_distance <= self.hash_value:
 
-                    score = ssim(first_img, second_img, full=False)
+                    score = ssim(first_img, second_img, full=False,
+                                 win_size=3, gaussian_weights=True)
                     print(score)
 
                     if score >= 0.75:
-                        if image_files[i] not in self.double_sceen:
-                            self.double_paths.append(image_files[i])
-                            self.double_sceen.add(image_files[i])
+                        if first_input_path not in double_image_set:
+                            double_image_list.append(first_input_path)
+                            double_image_set.add(first_input_path)
 
-                        if image_files[j] not in self.double_sceen:
-                            self.double_paths.append(image_files[j])
-                            self.double_sceen.add(image_files[j])
+                        if second_input_path not in double_image_set:
+                            double_image_list.append(second_input_path)
+                            double_image_set.add(second_input_path)
 
                         self.signals.progress.emit(
-                            f"{image_files[i]}, {image_files[j]}: 중복답안")
+                            f"{first_input_path}, {second_input_path}: 중복답안")
                     else:
                         self.signals.progress.emit(
-                            f"{image_files[i]}, {image_files[j]}: 중복 아님")
-
-                sub_idx += 1
-            main_idx += 1
+                            f"{first_input_path}, {second_input_path}: 중복 아님")
 
             # 비교 진행도 추가
             self.signals.update_main_progress.emit(1)
 
             self.file_end = time.time()
             self.signals.progress.emit(
-                f"\n\n파일 처리 시간 {self.file_end - self.file_start:4f}초\n\n")
+                f"\n\n파일 처리 시간 {self.file_end - self.file_start}\n\n")
 
         self.main_end = time.time()
 
-        self.signals.blank_images.emit(self.blank_paths)
-        self.signals.double_images.emit(self.double_paths)
+        self.signals.blank_images.emit(blank_image_list)
+        self.signals.double_images.emit(double_image_list)
         self.signals.finished.emit()
         self.signals.progress.emit("검사완료")
         self.signals.progress.emit(
-            f"\n\n전체 처리 시간 {self.main_end - self.main_start:4f}초")
+            f"\n\n전체 처리 시간 {self.main_end - self.main_start}")

@@ -1,6 +1,8 @@
 import cv2
+from matplotlib.path import Path
 import numpy as np
-from pathlib import Path
+import os
+import matplotlib.pyplot as plt
 
 
 def sort_corners(pts):
@@ -34,14 +36,41 @@ def get_skew_angle(img):
             contour, 0.02 * cv2.arcLength(contour, True), True)
         area = cv2.contourArea(contour)
 
-        if len(approx) == 4 and cv2.isContourConvex(approx) and 200 < area < 1000:
+        if cv2.isContourConvex(approx) and 300 < area < 1000 and len(approx) <= 4:
             x, y, w, h = cv2.boundingRect(contour)
             quadrate_ratio = w / float(h)
-            if 0.8 < quadrate_ratio < 1.2:
+            if 0.5 < quadrate_ratio < 1.5:
                 markers.append((x, y))
                 filter_cnt.append(contour)
 
     if len(markers) != 4:
+
+        # for contour in contours:
+
+        #     approx = cv2.approxPolyDP(
+        #         contour, 0.02 * cv2.arcLength(contour, True), True)
+        #     area = cv2.contourArea(contour)
+        #     x, y, w, h = cv2.boundingRect(contour)
+        #     quadrate_ratio = w / float(h)
+
+        #     print(
+        #         f"approx_count: {len(approx)}, {cv2.isContourConvex(approx)}")
+        #     print(f"area: {area}, x: {x}, y: {y}")
+        #     print(f"squre_ratio: {quadrate_ratio}")
+
+        #     img_copy = img.copy()  # 원본 보호
+
+        #     cv2.drawContours(img_copy, [contour], -1, (0, 255, 0), 3)
+
+        #     # BGR → RGB 변환 (Matplotlib용)
+        #     img_rgb = cv2.cvtColor(img_copy, cv2.COLOR_BGR2RGB)
+
+        #     plt.figure(figsize=(12, 8))
+        #     plt.imshow(img_rgb)
+        #     plt.axis("off")
+        #     plt.title(f"컨투어 위치: ({x}, {y}) / 면적: {area}")
+        #     plt.show()
+
         # cv2.drawContours(img, filter_cnt, -1, (0, 255, 0), 3)
 
         # plt.figure(figsize=(24, 12))
@@ -56,7 +85,6 @@ def get_skew_angle(img):
 
 
 def correct_skew(img):
-    # img_path = Path(img_path)
 
     # with open(img_path, "rb") as f:
     #     file_bytes = np.asarray(bytearray(f.read()), dtype=np.uint8)
@@ -77,5 +105,25 @@ def correct_skew(img):
 
     return warped
 
-# 사용 예시
-# corrected_img = correct_skew("omr_image.jpg")
+
+# if __name__ == "__main__":
+#     folder_path = r"C:\Users\hojin\OneDrive\Desktop\이중급지 테스트용 답안"
+
+#     IMAGE_EXTENSIONS = (
+#         ".png", ".jpg", ".jpeg", ".bmp")  # 허용되는 확장자
+
+#     # 확장자 검사
+#     image_paths = [
+#         os.path.join(folder_path, f).replace("\\", "/")
+#         for f in os.listdir(folder_path)
+#         if f.lower().endswith(IMAGE_EXTENSIONS)
+#     ]
+
+#     for path in image_paths:
+#         print(os.path.basename(
+#             path), "**********************************************************************")
+#         correct_skew(path)
+
+#     # correct_skew(r"C:\Users\hojin\OneDrive\Desktop\이중급지 테스트용 답안\1000361.JPG")
+
+#     # r"C:\Users\hojin\OneDrive\Desktop\이중급지 테스트용 답안\1000361.JPG"

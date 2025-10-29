@@ -26,7 +26,7 @@ class omr_gui(QWidget):
             current_path = os.path.dirname(os.path.abspath(__file__))
         window_icon = os.path.join(
             current_path, "images", "icon", "double_check_icon.ico")
-        
+
         self.current_mode = ""
 
         # QWdget 설정
@@ -47,9 +47,15 @@ class omr_gui(QWidget):
         self.image_loader = LazyImageViewer()
         self.view = QGraphicsScene(self.image_loader.scene)
 
+        # footer_layout
+        container = SubContainer()
+        footer_layout = Footer(container.toggleLayout)
+
+        # footer_layout에 있는 검사 버튼을 비활성화 하기 위해서 위에 있음
         header_layout = Header(
             self.updateImage,
-            self.image_loader.scaleView
+            self.image_loader.scaleView,
+            footer_layout.toggleSubmitButton
         )
 
         # section_layout 추가
@@ -57,10 +63,6 @@ class omr_gui(QWidget):
 
         # section_layout 위젯 추가
         section_layout.addWidget(self.image_loader)
-
-        container = SubContainer()
-
-        footer_layout = Footer(container.toggleLayout)
 
         # main_container_layout 추가
         main_layout.addWidget(header_layout)
