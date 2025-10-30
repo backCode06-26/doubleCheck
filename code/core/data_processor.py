@@ -3,6 +3,7 @@ import sys
 import json
 import config
 
+
 def dataProcessing(folder_path):
 
     # 폴더 생성
@@ -33,10 +34,10 @@ def dataProcessing(folder_path):
 
     # 기본 데이터 형식
     data = {
-        "data" : [],
-        "main" : [null_img],
-        "blank" : [null_img],
-        "double" : [null_img],
+        "data": [],
+        "main": [null_img],
+        "blank": [null_img],
+        "double": [null_img],
     }
 
     # json 파일 생성
@@ -46,6 +47,8 @@ def dataProcessing(folder_path):
     config.current_json = data
 
 # 데이터 저장
+
+
 def saveJson(image_paths, mode="main"):
 
     # 받은 데이터로 저장

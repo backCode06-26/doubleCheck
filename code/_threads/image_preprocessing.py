@@ -1,8 +1,9 @@
 from PySide6.QtCore import QObject, Signal, QRunnable, Slot
-from concurrent.futures import ThreadPoolExecutor
+import multiprocessing
 from code.process.image_processor import ImageProcessor
 import config
 import time
+import os
 
 
 class ImagePreprocessingSingnals(QObject):
@@ -12,9 +13,8 @@ class ImagePreprocessingSingnals(QObject):
     finished = Signal()
 
 
-def process_image_wrapper(path):
-    """pickle 가능한 전역 함수"""
-    return ImageProcessor._process_single_image(path)
+def process_image_wrapper(path, folder_path, file_name):
+    return ImageProcessor._process_single_image(path, folder_path, file_name)
 
 
 class ImagePreprocessingRunnable(QRunnable):
@@ -29,35 +29,31 @@ class ImagePreprocessingRunnable(QRunnable):
         try:
 
             self.signals.progress.emit("이미지 전처리를 시작합니다.")
+            start_time = time.time()
+
+            self.signals.progress.emit(f"사용한 코어 수: {config.core_count}\n")
 
             results = []
-            total = len(self.image_paths)
 
-            # 멀티프로세싱으로 병렬 처리
-            with ThreadPoolExecutor(max_workers=config.core_count) as executor:
-                # 모든 작업을 한 번에 제출
-                futures = {
-                    executor.submit(process_image_wrapper, path): path
-                    for path in self.image_paths
-                }
+            output_path = os.path.join(
+                os.path.dirname(self.image_paths[0]), "data")
 
-                # 완료된 작업부터 순차적으로 수집
-                start_time = time.time()
+            tasks = [(path, output_path, os.path.basename(path))
+                     for path in self.image_paths]
+            total = len(tasks)
 
-                from concurrent.futures import as_completed
-                for idx, future in enumerate(as_completed(futures), 1):
-                    try:
-                        image_data = future.result()
-                        results.append(image_data)
-                        self.signals.progress.emit(f"{idx}/{total} 이미지 전처리 완료")
-                    except Exception as e:
-                        self.signals.error.emit(f"이미지 처리 오류: {str(e)}")
+            with multiprocessing.Pool(processes=config.core_count) as pool:
+                result_list = pool.starmap_async(
+                    process_image_wrapper, tasks).get()
 
-                end_time = time.time()
+            for idx, result in enumerate(result_list, 1):
+                self.signals.progress.emit(f"{idx}/{total} 작업이 완료되었습니다.")
+                results.append(result)
 
-                work_time = end_time - start_time
+            end_time = time.time()
 
-            self.signals.progress.emit("전체 이미지 처리를 완료하였습니다.")
+            work_time = end_time - start_time
+            self.signals.progress.emit("\n전체 이미지 처리를 완료하였습니다.")
             self.signals.progress.emit(f"작업에 걸린 시간: {work_time}")
             config.all_time += work_time
             self.signals.result.emit(results)

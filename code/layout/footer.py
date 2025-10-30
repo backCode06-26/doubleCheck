@@ -90,10 +90,6 @@ class Footer(QWidget):
             # 이미지 경로 저장
             saveJson(new_paths, mode)
 
-        folder_path = os.path.join(config.FOLDER_PATH, mode)
-        print(
-            f"{"백지" if mode == "blank" else "중복"} 답지의 경로 저장, {folder_path}에 이미지를 저장합니다.\n")
-
     # 검사 실행 함수
 
     def imageCheck(self):
@@ -107,7 +103,7 @@ class Footer(QWidget):
 
             # 작업 준비
             self.current_runnable = ImageProcessRunnable(
-                config.FOLDER_PATH, config.hash_value, batch_size=5)
+                config.FOLDER_PATH)
 
             # 시그널 연결 (.signals를 통해)
             self.current_runnable.signals.progress.connect(
@@ -118,13 +114,13 @@ class Footer(QWidget):
             self.current_runnable.signals.double_images.connect(
                 lambda lst: self.savePath(lst, "double"))
 
-            # # 진행률의 최대값 구하기
-            # self.current_runnable.signals.max_main_progress.connect(
-            #     lambda cnt: self.process.setMaximum(cnt))
+            # 진행률의 최대값 구하기
+            self.current_runnable.signals.max_progress.connect(
+                lambda max_count: self.progress.progress.setMaximum(max_count))
 
-            # # 진행률의 값 조작하기
-            # self.current_runnable.signals.update_main_progress.connect(
-            #     lambda cnt: self.update_progress(cnt))
+            # 진행률의 값 조작하기
+            self.current_runnable.signals.update_progress.connect(
+                self.progress.updateProgress)
 
             self.current_runnable.signals.finished.connect(
                 lambda: print("작업을 완료했습니다."))
@@ -132,5 +128,4 @@ class Footer(QWidget):
             # 스레드풀에서 실행
             self.thread_pool.start(self.current_runnable)
         else:
-            print(self.folder_path)
             print("폴더가 지정되지 않았습니다.")

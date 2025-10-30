@@ -86,10 +86,6 @@ def get_skew_angle(img):
 
 def correct_skew(img):
 
-    # with open(img_path, "rb") as f:
-    #     file_bytes = np.asarray(bytearray(f.read()), dtype=np.uint8)
-    # img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
-
     sorted_pts = get_skew_angle(img)
 
     h, w = img.shape[:2]
@@ -104,26 +100,3 @@ def correct_skew(img):
     warped = cv2.warpPerspective(img, M, (w, h))
 
     return warped
-
-
-# if __name__ == "__main__":
-#     folder_path = r"C:\Users\hojin\OneDrive\Desktop\이중급지 테스트용 답안"
-
-#     IMAGE_EXTENSIONS = (
-#         ".png", ".jpg", ".jpeg", ".bmp")  # 허용되는 확장자
-
-#     # 확장자 검사
-#     image_paths = [
-#         os.path.join(folder_path, f).replace("\\", "/")
-#         for f in os.listdir(folder_path)
-#         if f.lower().endswith(IMAGE_EXTENSIONS)
-#     ]
-
-#     for path in image_paths:
-#         print(os.path.basename(
-#             path), "**********************************************************************")
-#         correct_skew(path)
-
-#     # correct_skew(r"C:\Users\hojin\OneDrive\Desktop\이중급지 테스트용 답안\1000361.JPG")
-
-#     # r"C:\Users\hojin\OneDrive\Desktop\이중급지 테스트용 답안\1000361.JPG"

@@ -18,14 +18,12 @@ class ImageProcessor:
         return img
 
     @staticmethod
-    def cv2ToPIL(img):
-        cv_img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        pil_img = Image.fromarray(cv_img_rgb)
-        return pil_img
+    def getProcessedPil(cv_img):
+        cv_img_rgb = cv2.cvtColor(cv_img, cv2.COLOR_BGR2RGB)
+        return Image.fromarray(cv_img_rgb)
 
     @staticmethod
-    def getImageHash(img):
-        pil_img = ImageProcessor.cv2ToPIL(img)
+    def getImageHash(pil_img):
         hash_value = imagehash.phash(pil_img)
         return hash_value
 
@@ -33,28 +31,24 @@ class ImageProcessor:
         return imagehash.hex_to_hash(text)
 
     @staticmethod
-    def saveImage(img, output_path):
-        pil_img = ImageProcessor.cv2ToPIL(img)
+    def saveImage(pil_img, output_path):
         img_gray = pil_img.convert('L')
         img_gray.save(output_path)
 
     @staticmethod
-    def _process_single_image(path):
+    def _process_single_image(path, folder_path, file_name):
         try:
             img = ImageProcessor.getSafeImgLoad(path)
-
-            file_name = os.path.basename(path)
-            # config 모듈이 모든 프로세스에서 로드 가능해야 함
-            output_folder_path = config.OUTPUT_FOLDER_PATH
-
-            pre_img = correct_skew(img)  # 외부 함수 호출
+            pre_img = correct_skew(img)
+            is_blank = isBlankImage(pre_img)
+            pil_img = ImageProcessor.getProcessedPil(pre_img)
 
             output_path = os.path.join(
-                output_folder_path, file_name).replace("\\", "/")
-            ImageProcessor.saveImage(pre_img, output_path)
+                folder_path, file_name).replace("\\", "/")
 
-            image_hash = ImageProcessor.getImageHash(pre_img)
-            is_blank = isBlankImage(pre_img)  # 외부 함수 호출
+            image_hash = ImageProcessor.getImageHash(pil_img)
+
+            ImageProcessor.saveImage(pil_img, output_path)
 
             # 최종 결과를 반환
             return {
@@ -66,47 +60,6 @@ class ImageProcessor:
 
         except Exception as e:
             return {
+                "input_path": path,
                 "error": str(e)
             }
-
-
-# def batch_process_images(image_paths):
-#     try:
-#         total = len(image_paths)
-#         print(f"전체 이미지: {total}")
-
-#         with Pool(config.core_count) as pool:
-#             results = []
-
-#             for i, result in enumerate(pool.imap(ImageProcessor._process_single_image, image_paths), 1):
-#                 results.append(result)
-#                 print(
-#                     f"[PROGRESS] {i}/{total}: {os.path.basename(image_paths[i-1])}")
-
-#         with open(config.JSON_PATH, 'w', encoding='utf-8') as f:
-#             json.dump(results, f, indent=4, ensure_ascii=False)
-
-#         print(f"[STATUS] 완료: 이미지 전처리 결과를 '{config.JSON_PATH}'에 저장하였습니다.")
-
-#     except Exception as e:
-#         print(f"[ERROR] 배치 처리 중 치명적인 에러 발생: {e}")
-#         # 오류가 발생하면 종료 코드 1로 프로그램 종료
-#         exit(1)
-
-
-# if __name__ == '__main__':
-#     parser = argparse.ArgumentParser(
-#         description='멀티프로세스를 사용하여 이미지 배치 전처리를 수행합니다.'
-#     )
-
-#     parser.add_argument(
-#         '--image_paths',
-#         nargs="+",
-#         required=True,
-#         help='처리할 이미지의 경로을 입력해주세요'
-#     )
-
-#     args = parser.parse_args()
-
-#     # 메인 함수 실행
-#     batch_process_images(args.image_paths)

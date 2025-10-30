@@ -5,6 +5,7 @@ from PySide6.QtWidgets import (
 from code.widget.value_slider import ValueSlider
 import multiprocessing
 
+
 class SubContainer(QWidget):
     def __init__(self):
         super().__init__()
@@ -23,7 +24,8 @@ class SubContainer(QWidget):
         self.hash_slider = ValueSlider(5, 0, 10, "hash")
 
         self.core_slider_lable = QLabel("사용될 코어의 개수")
-        self.core_slider = ValueSlider(1, 1, cpu_count, "cpu")
+        self.core_slider = ValueSlider(
+            cpu_count, 1, cpu_count, "cpu")
 
         # section 위젯 추가
         self.section.addStretch(1)
