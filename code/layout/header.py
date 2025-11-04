@@ -1,4 +1,6 @@
 import os
+from pathlib import Path
+import config
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
@@ -7,11 +9,13 @@ from PySide6.QtWidgets import (
 
 from code.widget.select_btns import SelectBtns
 from code.widget.zoom_slider import ZoomSlider
+from code.widget.image_dropdown import Dropdown
 
 from PySide6.QtCore import QThreadPool
 from code._threads.image_preprocessing import ImagePreprocessingRunnable
 
 from code.core.data_processor import dataProcessing, saveJson
+from code.process.image_processor import ImageProcessor
 
 
 class Header(QWidget):
@@ -24,11 +28,11 @@ class Header(QWidget):
         super().__init__()
 
         # 변수
-        self.existing_path = ""  # 현재 폴더경로
+        self.existing_path = ""  # 현재 폴더경로 (문자열로 유지)
 
         # 함수
-        self.updateImage = updateImage  # 이미지 로드 함수
-        self.updateScaleView = updateScaleView  # 이미지 확대 축소 함수
+        self.updateImage = updateImage
+        self.updateScaleView = updateScaleView
         self.toggleSubmitButton = toggleSubmitButton
 
         # header_layout 추가
@@ -43,12 +47,15 @@ class Header(QWidget):
         # nav_layout 추가
         nav_layout = QHBoxLayout()
 
-        # 전체, 중복, 백지 답안을 보여주는 토글 버튼
-        self.update_image_button = SelectBtns(self.updateImage)
-        self.scale_slider = ZoomSlider(self.updateScaleView)
+        self.update_image_button = SelectBtns(
+            self.updateImage)  # 전체, 백지, 중복 이미지를 선택하는 위젯
+        self.update_image_dropdown = Dropdown()  # 교시, 교사실 번호를 선택하는 위젯
+        self.scale_slider = ZoomSlider(
+            self.updateScaleView)  # 이미지의 크기를 조절하는 위젯
 
         # nav_layout 위젯 추가
         nav_layout.addWidget(self.update_image_button, 6)
+        nav_layout.addWidget(self.update_image_dropdown)
         nav_layout.addStretch(15)
         nav_layout.addWidget(self.scale_slider, 1)
 
@@ -81,55 +88,80 @@ class Header(QWidget):
 
         # 새로 받을 폴터 경로
         print("이미지 폴터를 선택하고 있습니다.")
-        self.new_folder_path = QFileDialog.getExistingDirectory(
+        # QFileDialog는 경로를 문자열로 반환합니다.
+        new_folder_path_str = QFileDialog.getExistingDirectory(
             self, "이미지 폴더를 선택해주세요")
 
-        if self.new_folder_path:
-            # 현재 경로와 다른 경로만 저장
-            if self.existing_path != self.new_folder_path:
+        if new_folder_path_str:
+            new_folder_path = Path(new_folder_path_str)
+
+            # 현재 경로와 다른지 비교
+            if self.existing_path != new_folder_path_str:
 
                 # 현재 경로로 지정
-                self.existing_path = self.new_folder_path
+                self.existing_path = new_folder_path_str
 
-                self.toggleButton()
+                depth_data = {}
+                max_depth_observed = 0  # 최대 깊이 추적용
 
-                print("폴더 안 이미지의 경로 가져오는 중입니다.")
-                IMAGE_EXTENSIONS = (
-                    ".png", ".jpg", ".jpeg", ".bmp")  # 허용되는 확장자
+                # 지정한 파일의
+                for root_str, dirs, files in os.walk(self.existing_path):
 
-                # 확장자 검사
-                self.image_paths = [
-                    os.path.join(self.existing_path, f).replace("\\", "/")
-                    for f in os.listdir(self.existing_path)
-                    if f.lower().endswith(IMAGE_EXTENSIONS)
-                ]
+                    # 현재 경로 추출
+                    current_path = Path(root_str)
 
-                self.back_image_paths = [
-                    f
-                    for f in self.image_paths
-                    if os.path.splitext(os.path.basename(f))[0][-1] == "2"
-                ]
+                    try:
+                        # / 기준으로 경로를 배열로 변경합니다.
+                        parts_list = list(Path(root_str).parts)
+                        # 배열로 만든 경로를 기준으로 마지막 3개의 경로만 가져옵니다.
+                        major_code, class_period, classroom_code = parts_list[-3:]
 
-                # 이미지가 존재하는지 확인합니다.
-                if not self.image_paths:
-                    print("선택한 폴더에 이미지가 없습니다.")
-                    self.toggleButton()
-                    return
+                        parts_tuple = (
+                            major_code, class_period, classroom_code)
+                    except ValueError:
+                        if current_path == new_folder_path:
+                            parts_tuple = ()
+                        else:
+                            continue
 
-                # 시작전 기본 설정
-                dataProcessing(self.existing_path)
+                    # '.', 'data'를 제외한 경로만 가져옵니다.
+                    cleaned_parts = [
+                        part for part in parts_tuple
+                        if part and part != '.' and part != 'data'
+                    ]
 
-                # 저장된 위치
-                mode = "main"
-                saveJson(self.image_paths, mode)  # 이미지 저장
+                    current_depth = len(cleaned_parts)
+                    max_depth_observed = max(max_depth_observed, current_depth)
 
-                self.runImagePrecess(self.back_image_paths)
+                    # 현재 깊이를 키로 사용하여 데이터 저장
+                    if current_depth not in depth_data:
+                        depth_data[current_depth] = []
 
-                self.updateImage(mode)  # 이미지 변경
+                    # depth_data에 저장 (root: 경로, parts: 계열, 교시, 고사실 번호)
+                    depth_data[current_depth].append({
+                        "root": root_str,
+                        "parts": parts_tuple
+                    })
+
+                # 데이터 필터링
+                final_processing_list = depth_data.get(max_depth_observed, [])
+
+                for item in final_processing_list:
+                    current_root = item["root"]
+
+                    major_code, class_period, classroom_code = item["parts"]
+
+                    json_name = f"{major_code}{class_period}{classroom_code}.json"
+
+                    dataProcessing(current_root, json_name)
+
+                # 전체 경로 저장
+                config.OUTPUT_FOLDER_PATH = self.existing_path
 
                 print("이미지 경로 저장 및 불러오기를 완료했습니다.\n")
+                # self.toggleButton()
             else:
-                print("선택하지 폴더가 이전의 폴더의 경로와 같습니다.\n")
-                self.toggleButton()
+                print("선택하신 폴더가 이전의 폴더의 경로와 같습니다.\n")
+                # self.toggleButton()
         else:
             print("이미지 폴더 선택을 취소하셨습니다.\n")

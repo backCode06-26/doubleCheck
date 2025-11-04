@@ -16,9 +16,9 @@ class Progress(QWidget):
         self.progress.setValue(0)
 
     # 프로그레스 바 증가 함수
-    def updateProgress(self, num):
+    def updateProgress(self):
         current = self.progress.value()
-        self.progress.setValue(current + num)
+        self.progress.setValue(current + 1)
 
     # # 프로그레스 바 마지막 처리 함수
     # def last_progress(self):

@@ -70,7 +70,7 @@ class Footer(QWidget):
             config.FOLDER_PATH, image_path).replace("\\", "/")
         return change_path
 
-        # 백지, 중복 답안 저장 함수
+    # 백지, 중복 답안 저장 함수
     def savePath(self, paths, mode):
 
         new_paths = []

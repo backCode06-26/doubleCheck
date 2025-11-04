@@ -10,6 +10,35 @@ from code.core.rotate_correction import correct_skew
 
 
 class ImageProcessor:
+
+    @staticmethod
+    def getImagePaths(folder_path):
+
+        # 이미지를 찾을 폴더의 경로가 유효한지 확압니다.
+        if not os.path.isdir(folder_path):
+            print("경로를 찾을 수 없습니다.")
+            return None
+
+        IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".bmp")  # 허용되는 확장자
+
+        # 폴더 안 이미지의 경로를 가져옵니다.
+        image_paths = [
+            # os.path.join(self.existing_path, f).replace("\\", "/")
+            ImageProcessor.getClearPath(os.path.join(folder_path, f))
+            for f in os.listdir(folder_path)
+            if f.lower().endswith(IMAGE_EXTENSIONS)
+        ]
+
+        # 이미지가 존재하는지 확인합니다.
+        if not image_paths:
+            print("선택한 폴더에 이미지가 없습니다.")
+            return None
+
+        return image_paths
+
+    def getClearPath(path):
+        return path.replace("\\", "/")
+
     @staticmethod
     def getSafeImgLoad(img_path):
         with open(img_path, "rb") as f:

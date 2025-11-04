@@ -1,50 +1,47 @@
-import os
+from pathlib import Path
 import sys
 import json
 import config
 
+from code.process.image_processor import ImageProcessor
 
-def dataProcessing(folder_path):
+
+def dataProcessing(folder_path, json_name):
 
     # 폴더 생성
-    output_folder_path = os.path.join(folder_path, "data")
+    folder_path = Path(folder_path)
+    output_folder_path = folder_path / "data"
 
-    # json 파일 경로
-    json_path = os.path.join(output_folder_path, "config.json")
-
-    config.FOLDER_PATH = folder_path
-    config.JSON_PATH = json_path
-    config.OUTPUT_FOLDER_PATH = output_folder_path
-
-    # 폴더가 없으면 생성
-    if not os.path.exists(output_folder_path):
-        os.makedirs(output_folder_path)
+    output_folder_path.mkdir(parents=True, exist_ok=True)
 
     # 있다면 기존의 내용 삭제
-    for img_name in os.listdir(output_folder_path):
-        os.remove(os.path.join(output_folder_path, img_name))
+    for img_name in output_folder_path.iterdir():
+        img_name.unlink(missing_ok=True)
 
     # 대체 이미지 경로
     if getattr(sys, "frozen", False):
-        current_path = os.path.dirname(os.path.abspath(sys.executable))
+        current_path = Path(__file__).resolve().parent
+        print(current_path)
     else:
-        current_path = r"C:\Users\hojin\OneDrive\Desktop\DoubleCheck\dist"
-    null_img = os.path.join(
-        current_path, "images", "null_image.JPG").replace("\\", "/")
+        current_path = Path(
+            r"C:\Users\hojin\OneDrive\Desktop\DoubleCheck\dist")
+    null_img = current_path / "images" / "null_image.JPG"
+
+    main_images = ImageProcessor.getImagePaths(folder_path)
 
     # 기본 데이터 형식
     data = {
         "data": [],
-        "main": [null_img],
+        "main": [main_images],
         "blank": [null_img],
         "double": [null_img],
     }
 
-    # json 파일 생성
-    with open(config.JSON_PATH, "w", encoding="utf-8") as f:
-        json.dump(config.current_json, f, indent=4, ensure_ascii=False)
+    json_path = folder_path / json_name
 
-    config.current_json = data
+    # json 파일 생성
+    with open(json_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4, ensure_ascii=False)
 
 # 데이터 저장
 
