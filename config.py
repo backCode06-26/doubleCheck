@@ -10,4 +10,4 @@ current_json = None
 # 검사에 필요한 데이터
 FOLDER_PATH = None
 hash_value = 5
-core_count = multiprocessing.cpu_count() - 1
+core_count = int(multiprocessing.cpu_count() / 2)

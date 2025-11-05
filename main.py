@@ -1,11 +1,11 @@
 from PySide6.QtWidgets import QApplication
-from code.widget.omr_gui import omr_gui
+from app_code.widget.main_window import MainWindow
 import sys
 
 
 def main():
     app = QApplication(sys.argv)
-    window = omr_gui()
+    window = MainWindow()
     window.showMaximized()
     app.exec()
 

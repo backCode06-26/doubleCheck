@@ -1,0 +1,19 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python Debugger: Python File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            
+            // 🌟 이 부분을 추가하여 Matplotlib GUI 통합을 우회합니다.
+            "env": {
+                // 'Agg'는 파일 생성 전용 백엔드로, 디버거가 GUI 이벤트를 후킹하지 않도록 만듭니다.
+                "MPLBACKEND": "Agg" 
+            },
+            
+            "justMyCode": true 
+        }
+    ]
+}
