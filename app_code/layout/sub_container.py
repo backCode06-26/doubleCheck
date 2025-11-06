@@ -40,7 +40,7 @@ class SubContainer(QWidget):
         self.setLayout(self.section)
 
      # 레이아웃 토글 함수
-    def toggleLayout(self):
+    def toggle_layout(self):
         for i in range(self.section.count()):
             item = self.section.itemAt(i)
             widget = item.widget()

@@ -1,10 +1,10 @@
-import os
+from pathlib import Path
 import cv2
 import time
 import config
 from PySide6.QtCore import QObject, Signal, QRunnable
 from app_code.process.image_processor import ImageProcessor
-import multiprocessing
+from app_code.core.data_processor import read_json
 from skimage.metrics import structural_similarity as ssim
 
 IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".bmp")
@@ -65,11 +65,9 @@ def compare_single_pair(i, j):
 
 class ImageProcessRunnable(QRunnable):
 
-    def __init__(self, folder_path):
+    def __init__(self):
         super().__init__()
         self.signals = ImageProcessSignals()
-
-        self.folder_path = folder_path  # 폴더 경로
 
     def run(self):
 
@@ -77,12 +75,7 @@ class ImageProcessRunnable(QRunnable):
 
         start_time = time.time()
 
-        if not self.folder_path:
-            self.signals.progress.emit("폴더 경로 없음")
-            self.signals.finished.emit()
-            return
-
-        share_list = config.current_json["data"]
+        share_list = read_json(config.current_json, "data")
 
         global G_SHARE_LIST
         G_SHARE_LIST = share_list
@@ -122,9 +115,9 @@ class ImageProcessRunnable(QRunnable):
                         blank_image_set.add(input_path_j)
                     continue
 
-                first_hash = ImageProcessor.textToHash(
+                first_hash = ImageProcessor.text_to_hash(
                     first_data["image_hash"])
-                second_hash = ImageProcessor.textToHash(
+                second_hash = ImageProcessor.text_to_hash(
                     second_data["image_hash"])
 
                 hamming_distance = first_hash - second_hash

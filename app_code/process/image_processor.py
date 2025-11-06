@@ -3,6 +3,7 @@ import cv2
 import numpy as np
 import imagehash
 from PIL import Image
+import config
 
 from app_code.core.blank_checker import is_blank_img
 from app_code.core.rotate_correction import correct_skew
@@ -12,6 +13,8 @@ class ImageProcessor:
 
     @staticmethod
     def get_image_paths(folder_path):
+
+        folder_path = Path(folder_path)
 
         # 이미지를 찾을 폴더의 경로가 유효한지 확압니다.
         if not folder_path.exists():
@@ -65,7 +68,15 @@ class ImageProcessor:
             img = ImageProcessor.get_safe_load_img(path)  # 실제 이미지 로드
 
             pre_img = correct_skew(img)
-            pil_img = ImageProcessor.get_process_pli(pre_img)  # pil_img로 변경
+
+            x1 = int(config.left)
+            y1 = int(config.top)
+            x2 = int(config.right)
+            y2 = int(config.bottom)
+
+            cropped = pre_img[y1:y2, x1:x2]
+
+            pil_img = ImageProcessor.get_process_pli(cropped)  # pil_img로 변경
 
             is_blank = is_blank_img(pre_img)  # 백지인지 판단
             image_hash = ImageProcessor.get_image_hash(pil_img)  # 이미지 해시값

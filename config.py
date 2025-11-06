@@ -1,13 +1,15 @@
 import multiprocessing
 
-OUTPUT_FOLDER_PATH = None
 all_time = 0
 
-# 파일 경로 저장에 필요한 데이터
-JSON_PATH = None
+# 검사에 필요한 데이터
+json_paths = []
 current_json = None
 
-# 검사에 필요한 데이터
-FOLDER_PATH = None
+top = 0
+bottom = 0
+right = 0
+left = 0
+
 hash_value = 5
 core_count = int(multiprocessing.cpu_count() / 2)

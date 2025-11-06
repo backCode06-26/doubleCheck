@@ -2,45 +2,36 @@ from PySide6.QtWidgets import (
     QWidget, QHBoxLayout, QComboBox, QLabel
 )
 
+import config
+from app_code.core.data_processor import read_json
 
-class Dropdown(QWidget):
-    def __init__(self):
+
+class ImageDropDown(QWidget):
+    def __init__(self, update_image):
         super().__init__()
+
+        self.data = None
+        self.update_image = update_image
 
         layout = QHBoxLayout(self)
 
-        self.academic_field_label = QLabel("계열: ")
-        self.academic_field_dropdown = QComboBox()  # 교시 드롭다운
-        self.academic_field_dropdown.addItem("계열 없음", None)  # 기본값
+        self.label = QLabel("계열: ")
+        self.dropdown = QComboBox()
 
-        self.period_label = QLabel("교시: ")
-        self.period_dropdown = QComboBox()  # 교시 드롭다운
-        self.period_dropdown.addItem("교시 없음", None)  # 기본값
+        # 레이아웃 위젯 추가
+        layout.addWidget(self.label)
+        layout.addWidget(self.dropdown)
 
-        self.exam_room_label = QLabel("고사실 번호: ")
-        self.exam_room_dropdown = QComboBox()  # 교사실 드롭다운
-        self.exam_room_dropdown.addItem("고사실 번호 없음", None)
+        # 계열 드롭다운이 변경될 때 작동
+        self.dropdown.currentIndexChanged.connect(self.load_image)
 
-        layout.addWidget(self.academic_field_label)
-        layout.addWidget(self.academic_field_dropdown)
-        layout.addStretch(2)
-        layout.addWidget(self.period_label)
-        layout.addWidget(self.period_dropdown)
-        layout.addStretch(2)
-        layout.addWidget(self.exam_room_label)
-        layout.addWidget(self.exam_room_dropdown)
+    def update_item(self, json_paths):
+        self.dropdown.addItems(json_paths)
 
-    def addDropDonwData(self, datas, type="pd"):
-        """
-        계열(af) 또는 교시(pd), 고사실 번호(er) 드롭다운을 추가합니다.
-        type 매개변수에는 'pd' 또는 'er'을 지정하세요.
-        """
-        target = self.academic_field_dropdown if type == "af" else (
-            self.period_dropdown if type == "pd" else self.exam_room_dropdown)
-        value_name = "계열" if type == "af" else (
-            "교시" if type == "pd" else "고사실 번호")
+    def load_image(self):
+        json_path = self.dropdown.currentText()
+        print(json_path)
 
-        target.clear()
+        config.current_json = json_path
 
-        for value in datas:
-            target.addItem(f"{value_name} {value}", value)
+        self.update_image("main")

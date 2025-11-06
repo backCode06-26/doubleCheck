@@ -62,7 +62,7 @@ class Footer(QWidget):
         footer_layout.addLayout(process_layout)
         footer_layout.addLayout(button_container)
 
-    def toggleSubmitButton(self, enable):
+    def toggle_submit_button(self, enable):
         self.submit_btn.setEnabled(enable)
 
     def changePath(self, image_path):
@@ -71,7 +71,7 @@ class Footer(QWidget):
         return change_path
 
     # 백지, 중복 답안 저장 함수
-    def savePath(self, paths, mode):
+    def save_path(self, paths, mode):
 
         new_paths = []
         for path in paths:
@@ -96,36 +96,31 @@ class Footer(QWidget):
         # 프로그래스 값 초기화
         self.progress.reset()
 
-        if config.FOLDER_PATH:
+        # 작업을 이행할 공간 할당
+        self.thread_pool = QThreadPool.globalInstance()
 
-            # 작업을 이행할 공간 할당
-            self.thread_pool = QThreadPool.globalInstance()
+        # 작업 준비
+        self.current_runnable = ImageProcessRunnable()
 
-            # 작업 준비
-            self.current_runnable = ImageProcessRunnable(
-                config.FOLDER_PATH)
+        # 시그널 연결 (.signals를 통해)
+        self.current_runnable.signals.progress.connect(
+            lambda msg: print(msg))
 
-            # 시그널 연결 (.signals를 통해)
-            self.current_runnable.signals.progress.connect(
-                lambda msg: print(msg))
+        self.current_runnable.signals.blank_images.connect(
+            lambda lst: self.save_path(lst, "blank"))
+        self.current_runnable.signals.double_images.connect(
+            lambda lst: self.save_path(lst, "double"))
 
-            self.current_runnable.signals.blank_images.connect(
-                lambda lst: self.savePath(lst, "blank"))
-            self.current_runnable.signals.double_images.connect(
-                lambda lst: self.savePath(lst, "double"))
+        # 진행률의 최대값 구하기
+        self.current_runnable.signals.max_progress.connect(
+            lambda max_count: self.progress.progress.setMaximum(max_count))
 
-            # 진행률의 최대값 구하기
-            self.current_runnable.signals.max_progress.connect(
-                lambda max_count: self.progress.progress.setMaximum(max_count))
+        # 진행률의 값 조작하기
+        self.current_runnable.signals.update_progress.connect(
+            self.progress.updateProgress)
 
-            # 진행률의 값 조작하기
-            self.current_runnable.signals.update_progress.connect(
-                self.progress.updateProgress)
+        self.current_runnable.signals.finished.connect(
+            lambda: print("작업을 완료했습니다."))
 
-            self.current_runnable.signals.finished.connect(
-                lambda: print("작업을 완료했습니다."))
-
-            # 스레드풀에서 실행
-            self.thread_pool.start(self.current_runnable)
-        else:
-            print("폴더가 지정되지 않았습니다.")
+        # 스레드풀에서 실행
+        self.thread_pool.start(self.current_runnable)

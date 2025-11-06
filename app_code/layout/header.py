@@ -9,21 +9,22 @@ from PySide6.QtWidgets import (
 
 from app_code.widget.select_btns import SelectBtns
 from app_code.widget.zoom_slider import ZoomSlider
-from app_code.widget.image_dropdown import Dropdown
+from app_code.widget.image_dropdown import ImageDropDown
 
 from PySide6.QtCore import QThreadPool
 from app_code._threads.batch_image_precessor import BatchImagePreprocessingRunnable
 
-from app_code.process.image_processor import correct_skew
 from app_code.process.image_processor import ImageProcessor
+
+from app_code.widget.grapic_resizer import GraphicsWindow
 
 
 class Header(QWidget):
     def __init__(
         self,
-        updateImage,
-        updateScaleView,
-        toggleSubmitButton
+        update_image,
+        update_scale_view,
+        toggle_submit_button
     ):
         super().__init__()
 
@@ -31,9 +32,9 @@ class Header(QWidget):
         self.existing_path = ""  # 현재 폴더경로 (문자열로 유지)
 
         # 함수
-        self.updateImage = updateImage
-        self.updateScaleView = updateScaleView
-        self.toggleSubmitButton = toggleSubmitButton
+        self.update_image = update_image
+        self.update_scale_view = update_scale_view
+        self.toggle_submit_button = toggle_submit_button
 
         # header_layout 추가
         header_layout = QVBoxLayout(self)
@@ -47,15 +48,21 @@ class Header(QWidget):
         # nav_layout 추가
         nav_layout = QHBoxLayout()
 
-        self.update_image_button = SelectBtns(
-            self.updateImage)  # 전체, 백지, 중복 이미지를 선택하는 위젯
-        self.update_image_dropdown = Dropdown()  # 교시, 교사실 번호를 선택하는 위젯
+        nav_container_layout = QVBoxLayout()
+
+        # 전체, 백지, 중복 이미지를 선택하는 위젯
+        self.update_image_button = SelectBtns(update_image)
+        # 교시, 교사실 번호를 선택하는 위젯
+        self.update_image_dropdown = ImageDropDown(update_image)
+
+        nav_container_layout.addWidget(self.update_image_dropdown)
+        nav_container_layout.addWidget(self.update_image_button)
+
         self.scale_slider = ZoomSlider(
-            self.updateScaleView)  # 이미지의 크기를 조절하는 위젯
+            self.update_scale_view)  # 이미지의 크기를 조절하는 위젯
 
         # nav_layout 위젯 추가
-        nav_layout.addWidget(self.update_image_button, 6)
-        nav_layout.addWidget(self.update_image_dropdown)
+        nav_layout.addLayout(nav_container_layout)
         nav_layout.addStretch(15)
         nav_layout.addWidget(self.scale_slider, 1)
 
@@ -66,7 +73,7 @@ class Header(QWidget):
     # 폴더 선택, 제출 버튼을 비활성화 시키는 함수
     def toggle_button(self):
         enable = not self.update_folder_button.isEnabled()
-        self.toggleSubmitButton(enable)
+        self.toggle_submit_button(enable)
         self.update_folder_button.setEnabled(enable)
 
     # 이미지의 전처리를 하는 함수
@@ -144,6 +151,13 @@ class Header(QWidget):
                 # 데이터 필터링
                 final_processing_list = depth_data.get(max_depth_observed, [])
 
+                first_image = ImageProcessor.get_image_paths(
+                    final_processing_list[0]["root"])[1]
+
+                self.graphics_window = GraphicsWindow(first_image)
+                self.graphics_window.setWindowTitle("좌표 편집기")
+                self.graphics_window.show()
+
                 tasks = []
 
                 for item in final_processing_list:
@@ -156,23 +170,20 @@ class Header(QWidget):
                     image_paths = ImageProcessor.get_image_paths(
                         current_root)  # 이미지 경로
 
+                    current_root = str(current_root)
+
                     tasks.append({
                         "root": current_root,
                         "json_path": json_path,
                         "image_paths": image_paths
                     })
 
-                first_task = tasks[0]
-                folder_path = Path(first_task["root"])
-                target_path = folder_path.parent.parent.parent
-
-                image_path = first_task["image_paths"][0]  # 첫번째 이미지 추출
-                image_path = correct_skew(image_path)  # 이미지 보정
-
-                # 전체 경로 저장
-                config.OUTPUT_FOLDER_PATH = target_path
+                    # json 경로 저장
+                    config.json_paths.append(str(json_path))
 
                 self.image_precess(tasks)
+
+                self.update_image_dropdown.update_item(config.json_paths)
 
                 print("이미지 경로 저장 및 불러오기를 완료했습니다.\n")
             else:

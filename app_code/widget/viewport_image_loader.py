@@ -96,12 +96,12 @@ class LazyImageViewer(QWidget):
                 except Exception as e:
                     print(f"이미지 로드 오류: {e}")
 
-    def scaleView(self, factor):
+    def scale_view(self, factor):
         t = QTransform()
         t.scale(factor, factor)
         self.view.setTransform(t)
 
-    def loadImage(self, new_paths):
+    def load_image(self, new_paths):
         self.scene.clear()
         self.loaded_items = {}
 

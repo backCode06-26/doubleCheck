@@ -71,7 +71,7 @@ class BatchImagePreprocessingRunnable(QRunnable):
 
                 # json 파일 생성 및 작성
                 precompute_image_features(
-                    root_path, json_path, image_paths, processed_image_data)
+                    root_path, json_path, image_paths)
 
                 end_time = time.time()
                 work_time = end_time - start_time
