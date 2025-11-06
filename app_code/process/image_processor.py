@@ -81,7 +81,7 @@ class ImageProcessor:
             is_blank = is_blank_img(pre_img)  # 백지인지 판단
             image_hash = ImageProcessor.get_image_hash(pil_img)  # 이미지 해시값
 
-            output_path = str(folder_path / file_name)  # 저장 경로 지정
+            output_path = str(Path(folder_path) / file_name)  # 저장 경로 지정
 
             ImageProcessor.save_image(pil_img, output_path)
 
