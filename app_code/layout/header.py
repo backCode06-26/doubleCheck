@@ -1,10 +1,11 @@
 import os
-from pathlib import Path
+import time
 import config
+from pathlib import Path
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
-    QPushButton, QFileDialog
+    QPushButton, QFileDialog, QDialog
 )
 
 from app_code.widget.select_btns import SelectBtns
@@ -16,7 +17,7 @@ from app_code._threads.batch_image_precessor import BatchImagePreprocessingRunna
 
 from app_code.process.image_processor import ImageProcessor
 
-from app_code.widget.grapic_resizer import GraphicsWindow
+from app_code.widget.image_crop import ImageCropPanel
 
 
 class Header(QWidget):
@@ -76,17 +77,61 @@ class Header(QWidget):
         self.toggle_submit_button(enable)
         self.update_folder_button.setEnabled(enable)
 
-    # 이미지의 전처리를 하는 함수
-    def image_precess(self, tasks):
-        self._thread = QThreadPool()
+    # 지정한 폴더의 이미지가 담긴 폴더만 추출
+    def get_image_paths(self):
+        depth_data = {}
+        max_depth_observed = 0  # 최대 깊이 추적용
 
-        self.runnable = BatchImagePreprocessingRunnable(tasks)
+        # 지정한 파일의 이미지가 담긴 폴더만 추출
+        for root_str, dirs, files in os.walk(self.existing_path):
 
-        self.runnable.signals.progress.connect(print)
-        self.runnable.signals.error.connect(print)
-        self.runnable.signals.finished.connect(lambda: print("작업이 완료되었습니다."))
+            try:
+                # / 기준으로 경로를 배열로 변경합니다.
+                parts_list = list(Path(root_str).parts)
+                    
+                # 배열로 만든 경로를 기준으로 마지막 3개의 경로만 가져옵니다.
+                major_code, class_period, classroom_code = parts_list[-3:]
 
-        self._thread.start(self.runnable)
+                parts_tuple = (
+                    major_code, class_period, classroom_code)
+            except ValueError as e:
+                print(e)
+
+            # '.', 'data'를 제외한 경로만 가져옵니다.
+            cleaned_parts = [
+                part for part in parts_tuple
+                if part and part != '.' and part != 'data'
+            ]
+
+            current_depth = len(cleaned_parts)
+            max_depth_observed = max(max_depth_observed, current_depth)
+
+            # 현재 깊이를 키로 사용하여 데이터 저장
+            if current_depth not in depth_data:
+                depth_data[current_depth] = []
+
+            # depth_data에 저장 (root: 경로, parts: 계열, 교시, 고사실 번호)
+            depth_data[current_depth].append({
+                "root": root_str,
+                "parts": parts_tuple
+            })
+
+        # 데이터 필터링
+        final_processing_list = depth_data.get(max_depth_observed, [])
+
+        return final_processing_list
+    
+    def calculate_image_position(self, image_path):
+
+        image_crop = ImageCropPanel(image_path)
+        result = image_crop.exec()
+
+        if result == QDialog.Accepted:
+            print("크롭 완료!")
+            print(f"x1={config.x1}, y1={config.y1}, x2={config.x2}, y2={config.y2}")
+        else:
+            print("사용자가 취소했습니다.")
+
 
     # 기본 경로를 저장하는 함수
     def update_path(self):
@@ -98,7 +143,6 @@ class Header(QWidget):
             self, "이미지 폴더를 선택해주세요")
 
         if new_folder_path_str:
-            new_folder_path = Path(new_folder_path_str)
 
             # 현재 경로와 다른지 비교
             if self.existing_path != new_folder_path_str:
@@ -106,58 +150,20 @@ class Header(QWidget):
                 # 현재 경로로 지정
                 self.existing_path = new_folder_path_str
 
-                depth_data = {}
-                max_depth_observed = 0  # 최대 깊이 추적용
+                final_processing_list = self.get_image_paths()
 
-                # 지정한 파일의
-                for root_str, dirs, files in os.walk(self.existing_path):
+                # 이미지를 편집하는 위젯
+                first_folder_path = Path(final_processing_list[0]["root"])
 
-                    # 현재 경로 추출
-                    current_path = Path(root_str)
+                first_image_path = None
+                for f in first_folder_path.iterdir():
+                    if f.is_file() and f.suffix.lower() in config.IMAGE_EXTENSIONS:
+                        first_image_path = f
+                        break
 
-                    try:
-                        # / 기준으로 경로를 배열로 변경합니다.
-                        parts_list = list(Path(root_str).parts)
-                        # 배열로 만든 경로를 기준으로 마지막 3개의 경로만 가져옵니다.
-                        major_code, class_period, classroom_code = parts_list[-3:]
+                self.calculate_image_position(first_image_path)
 
-                        parts_tuple = (
-                            major_code, class_period, classroom_code)
-                    except ValueError:
-                        if current_path == new_folder_path:
-                            parts_tuple = ()
-                        else:
-                            continue
-
-                    # '.', 'data'를 제외한 경로만 가져옵니다.
-                    cleaned_parts = [
-                        part for part in parts_tuple
-                        if part and part != '.' and part != 'data'
-                    ]
-
-                    current_depth = len(cleaned_parts)
-                    max_depth_observed = max(max_depth_observed, current_depth)
-
-                    # 현재 깊이를 키로 사용하여 데이터 저장
-                    if current_depth not in depth_data:
-                        depth_data[current_depth] = []
-
-                    # depth_data에 저장 (root: 경로, parts: 계열, 교시, 고사실 번호)
-                    depth_data[current_depth].append({
-                        "root": root_str,
-                        "parts": parts_tuple
-                    })
-
-                # 데이터 필터링
-                final_processing_list = depth_data.get(max_depth_observed, [])
-
-                first_image = ImageProcessor.get_image_paths(
-                    final_processing_list[0]["root"])[1]
-
-                self.graphics_window = GraphicsWindow(first_image)
-                self.graphics_window.setWindowTitle("좌표 편집기")
-                self.graphics_window.show()
-
+                # 이미지 전처리를 위한 파라미터 처리
                 tasks = []
 
                 for item in final_processing_list:
@@ -181,12 +187,41 @@ class Header(QWidget):
                     # json 경로 저장
                     config.json_paths.append(str(json_path))
 
-                self.image_precess(tasks)
-
-                self.update_image_dropdown.update_item(config.json_paths)
+                self.image_precess(tasks, (config.x1, config.y1, config.x2, config.y2))
 
                 print("이미지 경로 저장 및 불러오기를 완료했습니다.\n")
             else:
                 print("선택하신 폴더가 이전의 폴더의 경로와 같습니다.\n")
         else:
             print("이미지 폴더 선택을 취소하셨습니다.\n")
+
+    # 이미지의 전처리를 하는 함수
+    def image_precess(self, tasks, crop_rect):
+        self._thread = QThreadPool()
+
+        self.runnable = BatchImagePreprocessingRunnable(tasks, crop_rect)
+
+        self.runnable.signals.progress.connect(print)
+        self.runnable.signals.error.connect(print)
+        self.runnable.signals.result.connect(self.image_save)
+        self.runnable.signals.finished.connect(self.is_finish)
+
+        self._thread.start(self.runnable)
+
+    # 스레드가 끝나는 경우 해야하는 작업
+    def is_finish(self):
+        print("작업이 완료되었습니다.")
+        self.update_image_dropdown.update_item(config.json_paths)
+
+    # 전처리한 이미지를 저장하는 함수
+    def image_save(self, data):
+        output_path = Path(data["output_path"])
+
+        try:
+            if output_path.exists():
+                output_path.unlink()
+        except PermissionError:
+            pass
+        
+        with open(output_path, "wb") as f:
+            f.write(data["image_bytes"])

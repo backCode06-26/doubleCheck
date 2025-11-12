@@ -1,18 +1,22 @@
 from pathlib import Path
 import sys
 import json
+import config
 
 
-def precompute_image_features(folder_path, json_path, image_pahts):
+def precompute_image_features(folder_path, json_path, image_pahts, proccessed_datas):
 
     # 폴더 생성
-    output_folder_path = folder_path / "data"
+    output_folder_path = Path(folder_path) / "data"
 
     output_folder_path.mkdir(parents=True, exist_ok=True)
 
     # 있다면 기존의 내용 삭제
     for img_name in output_folder_path.iterdir():
-        img_name.unlink(missing_ok=True)
+        try:
+            img_name.unlink(missing_ok=True)
+        except PermissionError:
+            pass
 
     # 대체 이미지 경로
     if getattr(sys, "frozen", False):
@@ -25,7 +29,7 @@ def precompute_image_features(folder_path, json_path, image_pahts):
 
     # 기본 데이터 형식
     data = {
-        "data": [],
+        "data": proccessed_datas,
         "main": image_pahts,
         "blank": [null_img],
         "double": [null_img],
@@ -43,7 +47,7 @@ def read_json(json_path, mode="main"):
     return load[mode]
 
 
-def update_json(json_path, results, mode="main"):
+def update_json(results, json_path, mode="main"):
 
     # json 내용 읽기
     with open(json_path, "r", encoding="utf-8") as f:

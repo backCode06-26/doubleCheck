@@ -21,7 +21,7 @@ class ImageProcessor:
             print("경로를 찾을 수 없습니다.")
             return None
 
-        IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".bmp")  # 허용되는 확장자
+        IMAGE_EXTENSIONS = config.IMAGE_EXTENSIONS
 
         # 폴더 안 이미지의 경로를 가져옵니다.
         image_paths = [
@@ -58,43 +58,42 @@ class ImageProcessor:
         return imagehash.hex_to_hash(text)
 
     @staticmethod
-    def save_image(pil_img, output_path):
-        img_gray = pil_img.convert('L')
-        img_gray.save(output_path)
-
-    @staticmethod
-    def _process_single_image(path, folder_path, file_name):
+    def _process_single_image(image_path, folder_path, crop_rect):
         try:
-            img = ImageProcessor.get_safe_load_img(path)  # 실제 이미지 로드
 
-            pre_img = correct_skew(img)
+            image_path = Path(image_path)
+            img = ImageProcessor.get_safe_load_img(image_path)  # 실제 이미지 로드
 
-            x1 = int(config.left)
-            y1 = int(config.top)
-            x2 = int(config.right)
-            y2 = int(config.bottom)
+            pre_img = correct_skew(img) # 이미지 정렬
+
+            # 자를 이미지의 왼쪽 위, 오른쪽 위, 왼쪽 아래, 오른쪽 아래의 좌표로 이미지를 자릅니다.
+
+            x1, y1, x2, y2 = crop_rect
 
             cropped = pre_img[y1:y2, x1:x2]
+            is_blank = is_blank_img(cropped)  # 백지인지 판단
 
             pil_img = ImageProcessor.get_process_pli(cropped)  # pil_img로 변경
-
-            is_blank = is_blank_img(pre_img)  # 백지인지 판단
             image_hash = ImageProcessor.get_image_hash(pil_img)  # 이미지 해시값
 
-            output_path = str(Path(folder_path) / file_name)  # 저장 경로 지정
-
-            ImageProcessor.save_image(pil_img, output_path)
+            output_path = str(Path(folder_path) / image_path.name)  # 저장 경로 지정            
 
             # 최종 결과를 반환
             return {
-                "input_path": path,
-                "pre_path": output_path,
-                "image_hash": str(image_hash),
-                "is_blank": is_blank
+                "pil_data": {
+                    "pil_img": pil_img.convert("L"),
+                    "output_path": output_path
+                },
+                "image_data": {
+                    "input_path": str(image_path),
+                    "pre_path": output_path,
+                    "image_hash": str(image_hash),
+                    "is_blank": is_blank
+                }
             }
 
         except Exception as e:
             return {
-                "input_path": path,
+                "input_path": image_path,
                 "error": str(e)
             }

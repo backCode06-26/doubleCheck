@@ -6,86 +6,103 @@ from PySide6.QtCore import QObject, Signal, QRunnable
 from app_code.core.data_processor import precompute_image_features
 from app_code.process.image_processor import ImageProcessor
 import traceback
+import io
 
 
 class BatchImagePreprocessingSingnals(QObject):
     progress = Signal(str)
     error = Signal(str)
-    result = Signal(list)  # 최종 결과 리스트를 보냄
+    result = Signal(object)
     finished = Signal()
 
 
-def process_image_wrapper(path, folder_path, file_name):
-    return ImageProcessor._process_single_image(path, folder_path, file_name)
+def process_image_wrapper(image_path, folder_path, crop_rect):
+    """자식 프로세스: 이미지 처리 후 바이트와 출력 경로를 반환"""
+    result = ImageProcessor._process_single_image(image_path, folder_path, crop_rect)
+
+    data = result["pil_data"]
+
+    pil_img = data["pil_img"]
+    output_path = data["output_path"]
+    
+    # 결과로 (이미지 바이트 리스트, image_data 반환)
+    return (pil_img, output_path), result["image_data"]
 
 
 class BatchImagePreprocessingRunnable(QRunnable):
-    def __init__(self, tasks):
+    def __init__(self, tasks, crop_rect):
         super().__init__()
         self.signals = BatchImagePreprocessingSingnals()
         self.tasks = tasks
+        self.crop_rect = crop_rect
 
     def run(self):
-        results = []
-
         try:
             self.signals.progress.emit("전체 이미지 전처리를 시작합니다.")
-
             all_time = 0
+
             for i, task in enumerate(self.tasks):
-                root_path = task['root']  # 폴더 경로
-                json_path = task['json_path']  # json 파일 경로
-                image_paths = task['image_paths']  # 전체 이미지 배열
+                folder_path = task['root']
+                json_path = task['json_path']
+                image_paths = task['image_paths']
 
                 self.signals.progress.emit(
                     f"\n[Task {i+1}/{len(self.tasks)}] 처리 시작: {json_path.name}")
 
                 start_time = time.time()
+                output_data_path = Path(folder_path) / "data"
 
-                output_data_path = root_path / "data"  # 이미지 저장 폴더
-
-                # 뒷장 이미지만 필터링한 배열
+                # 뒷장 이미지만 필터링
                 tasks_for_pool = [
-                    (path, output_data_path, Path(path).name)
+                    (Path(path), output_data_path, self.crop_rect)
                     for path in image_paths
                     if Path(path).stem[-1] == "2"
                 ]
 
                 total_images = len(tasks_for_pool)
-                processed_image_data = []
-
-                # 이미지 병렬 처리
-                # (이미지 경로, 전처리 이미지 경로, 이미지 해쉬, 백지 판단여부)
                 self.signals.progress.emit(
                     f"  > 이미지 {total_images}개 병렬 처리 시작 (코어 수: {config.core_count})")
 
+                # Pool에서 결과 반환
                 with multiprocessing.Pool(processes=config.core_count) as pool:
-                    result_list = pool.starmap_async(
-                        process_image_wrapper, tasks_for_pool).get()
+                    results = pool.starmap(process_image_wrapper, tasks_for_pool)
 
-                # 처리한 이미지의 로그 작업
-                for idx, result in enumerate(result_list, 1):
-                    self.signals.progress.emit(
-                        f"  > {idx}/{total_images} 이미지 처리 완료.")
-                    processed_image_data.append(result)
+                # 메인 프로세스에서 이미지 저장
+                saved_count = 0
+                processed_datas = []
 
-                # json 파일 생성 및 작성
-                precompute_image_features(
-                    root_path, json_path, image_paths)
+                for result in results:
+                    (pil_img, output_path), image_data = result
+
+                    processed_datas.append(image_data)
+
+                    # 이미지 데이터를 메인 스레드로 보내기
+                    # PIL 이미지를 BytesIO로 변환
+                    buf = io.BytesIO()
+                    pil_img.save(buf, format="JPEG")
+                    buf.seek(0)
+
+                    # Signal로 전달할 때는 dict로
+                    self.signals.result.emit({
+                        "image_bytes": buf.getvalue(),  # 바이트 데이터만 전달
+                        "output_path": str(output_path),  # 경로는 문자열로 전달
+                    })
+
+                    saved_count += 1
+                    self.signals.progress.emit(f"  > {saved_count}/{total_images} 이미지 저장 완료.")
+
+                # json 생성
+                precompute_image_features(folder_path, json_path, image_paths, processed_datas)
 
                 end_time = time.time()
+
                 work_time = end_time - start_time
-
-                all_time += work_time
-
+                config.all_time += work_time
                 self.signals.progress.emit(f"  > 작업 처리 시간: {work_time:.2f}초.")
 
-            self.signals.progress.emit(f"> 전체 작업 시간: {all_time:.2f}초.")
-
-            self.signals.result.emit(results)
-
         except Exception as e:
-            self.signals.error.emit(f"일괄 처리 중 예기치 않은 오류 발생: {e}")
+            tb = traceback.format_exc()
+            self.signals.error.emit(f"일괄 처리 중 예기치 않은 오류 발생: {e}\n\n스택트레이스:\n{tb}")
 
         finally:
             self.signals.finished.emit()

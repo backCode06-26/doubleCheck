@@ -65,66 +65,87 @@ def compare_single_pair(i, j):
 
 class ImageProcessRunnable(QRunnable):
 
-    def __init__(self):
+    def __init__(self, json_path):
         super().__init__()
         self.signals = ImageProcessSignals()
+        self.json_path = json_path
 
     def run(self):
 
-        self.signals.progress.emit("검사시작")
+        self.signals.progress.emit("전체 이미지 검사를 시작합니다.")
 
+        # 시작 시간 측정
         start_time = time.time()
 
-        share_list = read_json(config.current_json, "data")
+        # 전처리된 데이터
+        share_list = read_json(self.json_path, "data")
 
-        global G_SHARE_LIST
-        G_SHARE_LIST = share_list
-
+        # 로드된 이미지
         load_image_list = [ImageProcessor.get_safe_load_img(
             share["input_path"]) for share in share_list]
 
+        # 전역 함수로 외부로 데이터를 전달합니다.
+        # 함수에 매개변수로 받으면 데이터를 복사해야해서 속도가 느려짐
+
+        # 전처리된 데이터
+        global G_SHARE_LIST
+        G_SHARE_LIST = share_list
+
+        # 로드된 이미지
         global G_LOAD_IMAGES
         G_LOAD_IMAGES = load_image_list
 
-        blank_image_set = set()
-        total = len(share_list)
+        total = len(share_list) # 전체 데이터 개수
 
-        tasks = []
+
+        blank_image_set = set() # 백지 이미지
+        tasks = [] # 검사 데이터 배열
 
         for i in range(total):
 
+            # 첫번째 데이터
             first_data = share_list[i]
 
-            is_blank_i = first_data["is_blank"]
-            input_path_i = first_data["input_path"]
+            is_blank_i = first_data["is_blank"] # 백지인지 아닌지
+            input_path_i = first_data["input_path"] # 전처리 전 이미지 경로
 
+            # 백지인지
             if is_blank_i:
+                # 백지로 구분이 된 이미지 인지
                 if input_path_i not in blank_image_set:
                     blank_image_set.add(input_path_i)
                 continue
 
             for j in range(i+1, total):
 
+                # 두번째 데이터
                 second_data = share_list[j]
 
-                is_blank_j = second_data["is_blank"]
-                input_path_j = second_data["input_path"]
+                is_blank_j = second_data["is_blank"] # 백지인지 아닌지
+                input_path_j = second_data["input_path"] # 전처리 전 이미지 경로
 
+                # 백지 인지
                 if is_blank_j:
+                    # 백지로 구분이 된 이미지 인지
                     if input_path_j not in blank_image_set:
                         blank_image_set.add(input_path_j)
                     continue
 
                 first_hash = ImageProcessor.text_to_hash(
-                    first_data["image_hash"])
+                    first_data["image_hash"]) # 첫번째 이미지 해쉬
                 second_hash = ImageProcessor.text_to_hash(
-                    second_data["image_hash"])
+                    second_data["image_hash"]) # 두번째 이미지 해쉬
 
+                # 이미지 해쉬의 해밍거리 계산
                 hamming_distance = first_hash - second_hash
 
+                # 계산된 해밍거리와 허용된 임계값을 비교
+                # 해밍거리 보다 임계값이 커지면 서로 다르다고 판단
+                # 유사도 검사를 건너뜹니다.
                 if hamming_distance > config.hash_value:
                     continue
 
+                # 유사도 검사을 진행할 데이터만 저장
                 tasks.append((i, j))
 
         task_count = len(tasks)
@@ -154,11 +175,14 @@ class ImageProcessRunnable(QRunnable):
         self.signals.double_images.emit(double_image_list)
 
         end_time = time.time()
+        
+        work_time = end_time - start_time
+        config.all_time += work_time
 
         self.signals.progress.emit("이미지 처리를 완료했습니다.")
         self.signals.progress.emit(
             "-------------------------------------------------------")
-        self.signals.progress.emit(f"전체 진행 시간: {end_time - start_time}")
+        self.signals.progress.emit(f"  > 작업 처리 시간: {work_time:.2f}초.")
         self.signals.progress.emit(
             "-------------------------------------------------------")
         self.signals.finished.emit()

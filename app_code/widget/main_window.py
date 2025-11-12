@@ -31,6 +31,7 @@ class MainWindow(QWidget):
             current_path, "images", "icon", "double_check_icon.ico")
 
         self.current_mode = ""
+        self.current_json_path = ""
 
         # QWdget 설정
         self.setWindowTitle("OMR 이중 급지")
@@ -80,7 +81,7 @@ class MainWindow(QWidget):
 
     # 이미지를 변경하는 함수
     def update_image(self, mode="main"):
-        if self.current_mode != mode:
+        if self.current_mode != mode or self.current_json_path != config.json_paths:
 
             # 현재 경로를 변경된 경로로 변경합니다.
             self.current_mode = mode

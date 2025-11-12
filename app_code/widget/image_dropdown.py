@@ -23,15 +23,19 @@ class ImageDropDown(QWidget):
         layout.addWidget(self.dropdown)
 
         # 계열 드롭다운이 변경될 때 작동
-        self.dropdown.currentIndexChanged.connect(self.load_image)
+        self.dropdown.currentTextChanged.connect(self.load_image)
+
 
     def update_item(self, json_paths):
         self.dropdown.addItems(json_paths)
 
+    # 멀티 쓰레드를 할때 이거가 먼저 작동되는 문제가 있어서 해결해야함
     def load_image(self):
         json_path = self.dropdown.currentText()
-        print(json_path)
 
         config.current_json = json_path
 
-        self.update_image("main")
+        try:
+            self.update_image("main")
+        except Exception as e:
+            print("update_image error:", e)
