@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from PySide6.QtWidgets import (
     QWidget, QHBoxLayout, QComboBox, QLabel
 )
@@ -15,7 +17,7 @@ class ImageDropDown(QWidget):
 
         layout = QHBoxLayout(self)
 
-        self.label = QLabel("계열: ")
+        self.label = QLabel("답안: ")
         self.dropdown = QComboBox()
 
         # 레이아웃 위젯 추가
@@ -27,11 +29,14 @@ class ImageDropDown(QWidget):
 
 
     def update_item(self, json_paths):
-        self.dropdown.addItems(json_paths)
+
+        for json_path in json_paths:
+            json_name = Path(json_path).stem
+            self.dropdown.addItem(json_name, json_path)
 
     # 멀티 쓰레드를 할때 이거가 먼저 작동되는 문제가 있어서 해결해야함
     def load_image(self):
-        json_path = self.dropdown.currentText()
+        json_path = self.dropdown.currentData()
 
         config.current_json = json_path
 
